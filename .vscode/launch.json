@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Executar Sistema (Interface Gráfica)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/app_gui.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Executar Sistema (Terminal Interativo)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main.py",
+            "console": "integratedTerminal"
+        }
+    ]
+}

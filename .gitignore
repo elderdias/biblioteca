@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.env
+.venv/
+env/
+venv/
+
+# VS Code local cache
+.vscode/*
+!.vscode/launch.json
+!.vscode/settings.json
+
+# Logs
+*.log
