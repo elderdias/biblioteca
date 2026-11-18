@@ -3,6 +3,16 @@
 -- PostgreSQL 18
 -- ============================================================
 
+-- 0. TABELA DE USUÁRIOS (SISTEMA DE LOGIN)
+CREATE TABLE IF NOT EXISTS usuarios (
+    id_usuario SERIAL PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    login VARCHAR(50) NOT NULL UNIQUE,
+    senha_hash VARCHAR(256) NOT NULL,
+    cargo VARCHAR(50) DEFAULT 'Operador',
+    data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 1. TABELA DE ALUNOS
 CREATE TABLE IF NOT EXISTS alunos (
     id_aluno SERIAL PRIMARY KEY,

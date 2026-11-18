@@ -3,11 +3,51 @@ from database import test_connection, init_db
 import services.aluno_service as aluno_service
 import services.livro_service as livro_service
 import services.emprestimo_service as emprestimo_service
+import services.auth_service as auth_service
 
 def imprimir_cabecalho(texto: str):
     print("\n" + "=" * 60)
     print(f" {texto}".center(60))
     print("=" * 60)
+
+def autenticar_terminal():
+    """Realiza o processo de login ou cadastro pelo terminal."""
+    auth_service.inicializar_usuarios_padrao()
+    while True:
+        imprimir_cabecalho("ACESSO AO SISTEMA (LOGIN)")
+        print("1. Entrar com Usuário e Senha")
+        print("2. Cadastrar Novo Usuário")
+        print("0. Sair")
+        print("\n💡 Padrão inicial: Usuário 'admin' | Senha 'admin123'")
+        
+        op = input("\nEscolha uma opção: ").strip()
+        if op == "1":
+            login = input("Usuário: ").strip()
+            senha = input("Senha: ").strip()
+            user = auth_service.autenticar_usuario(login, senha)
+            if user:
+                print(f"\n✅ Bem-vindo, {user['nome']}! ({user['cargo']})")
+                return user
+            else:
+                print("\n❌ Usuário ou senha incorretos!")
+                input("Pressione ENTER para tentar novamente...")
+        elif op == "2":
+            print("\n-- Cadastrar Novo Usuário --")
+            nome = input("Nome completo: ").strip()
+            login = input("Login de acesso: ").strip()
+            cargo = input("Cargo [Bibliotecário]: ").strip() or "Bibliotecário"
+            senha = input("Senha: ").strip()
+            try:
+                auth_service.cadastrar_usuario(nome, login, senha, cargo)
+                print(f"✅ Usuário '{login}' cadastrado com sucesso! Agora você já pode fazer login.")
+            except Exception as e:
+                print(f"❌ Erro ao cadastrar: {e}")
+            input("Pressione ENTER para continuar...")
+        elif op == "0":
+            print("Encerrando.")
+            sys.exit(0)
+        else:
+            print("Opção inválida.")
 
 def menu_alunos():
     while True:
@@ -211,8 +251,8 @@ def menu_emprestimos():
 
 def main():
     if "--gui" in sys.argv:
-        from app_gui import BibliotecaApp
-        app = BibliotecaApp()
+        from app_gui import JanelaLogin
+        app = JanelaLogin()
         app.mainloop()
         return
 
@@ -222,15 +262,19 @@ def main():
     else:
         init_db()
 
+    usuario_atual = autenticar_terminal()
+
     while True:
         imprimir_cabecalho("SISTEMA DE GESTÃO DA BIBLIOTECA")
+        print(f"👤 Usuário: {usuario_atual['nome']} ({usuario_atual['cargo']})")
         print(f"Conexão: {'🟢 Online' if ok else '🔴 Offline'} (PostgreSQL)")
         print("\nEscolha o módulo desejado:")
         print("1. 🎓 Gerenciar Alunos")
         print("2. 📖 Gerenciar Livros")
         print("3. 🔄 Empréstimos e Devoluções")
-        print("4. 🖥️  Abrir Interface Gráfica (Desktop)")
+        print("4. 🖥️  Abrir Interface Gráfica (Tela de Login/Sistema)")
         print("5. 🔍 Testar Conexão com o Banco")
+        print("6. 🔄 Trocar de Usuário (Logout)")
         print("0. Sair")
 
         opcao = input("\nDigite sua opção: ").strip()
@@ -244,8 +288,8 @@ def main():
         elif opcao == "4":
             print("\nAbrindo interface gráfica...")
             try:
-                from app_gui import BibliotecaApp
-                app = BibliotecaApp()
+                from app_gui import JanelaLogin
+                app = JanelaLogin()
                 app.mainloop()
             except Exception as e:
                 print(f"Erro ao abrir interface gráfica: {e}")
@@ -254,6 +298,8 @@ def main():
             status = "✅ Sucesso" if sucesso else "❌ Erro"
             print(f"\n[{status}]: {texto}")
             input("\nPressione ENTER para continuar...")
+        elif opcao == "6":
+            usuario_atual = autenticar_terminal()
         elif opcao == "0":
             print("\nEncerrando sistema. Até logo!")
             break

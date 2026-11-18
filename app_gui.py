@@ -5,16 +5,287 @@ from datetime import datetime
 import services.aluno_service as aluno_service
 import services.livro_service as livro_service
 import services.emprestimo_service as emprestimo_service
+import services.auth_service as auth_service
 from database import test_connection
 from config import DB_HOST, DB_PORT, DB_NAME, DB_USER
 
 
-class BibliotecaApp(tk.Tk):
+# =============================================================================
+# JANELA DE CADASTRO DE NOVO USUÁRIO
+# =============================================================================
+class JanelaCadastroUsuario(tk.Toplevel):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.title("Cadastrar Novo Usuário")
+        self.geometry("400x420")
+        self.resizable(False, False)
+        self.transient(parent)
+        self.grab_set()
+
+        # Centralizar na tela
+        largura, altura = 400, 420
+        pos_x = (self.winfo_screenwidth() // 2) - (largura // 2)
+        pos_y = (self.winfo_screenheight() // 2) - (altura // 2)
+        self.geometry(f"{largura}x{altura}+{pos_x}+{pos_y}")
+
+        self.configure(bg="#f8fafc")
+        self._criar_widgets()
+
+    def _criar_widgets(self):
+        container = tk.Frame(self, bg="#ffffff", padx=25, pady=25, highlightbackground="#e2e8f0", highlightthickness=1)
+        container.pack(fill="both", expand=True, padx=15, pady=15)
+
+        tk.Label(container, text="👤 Novo Usuário", font=("Segoe UI", 14, "bold"), fg="#1e293b", bg="#ffffff").pack(anchor="w", pady=(0, 15))
+
+        tk.Label(container, text="Nome Completo:*", font=("Segoe UI", 9, "bold"), fg="#475569", bg="#ffffff").pack(anchor="w")
+        self.txt_nome = ttk.Entry(container, width=32, font=("Segoe UI", 10))
+        self.txt_nome.pack(fill="x", pady=(2, 10))
+
+        tk.Label(container, text="Login / Usuário:*", font=("Segoe UI", 9, "bold"), fg="#475569", bg="#ffffff").pack(anchor="w")
+        self.txt_login = ttk.Entry(container, width=32, font=("Segoe UI", 10))
+        self.txt_login.pack(fill="x", pady=(2, 10))
+
+        tk.Label(container, text="Cargo / Função:", font=("Segoe UI", 9, "bold"), fg="#475569", bg="#ffffff").pack(anchor="w")
+        self.combo_cargo = ttk.Combobox(container, values=["Operador", "Bibliotecário", "Administrador"], state="readonly", font=("Segoe UI", 10))
+        self.combo_cargo.set("Bibliotecário")
+        self.combo_cargo.pack(fill="x", pady=(2, 10))
+
+        tk.Label(container, text="Senha:* (mínimo 4 caracteres)", font=("Segoe UI", 9, "bold"), fg="#475569", bg="#ffffff").pack(anchor="w")
+        self.txt_senha = ttk.Entry(container, show="*", width=32, font=("Segoe UI", 10))
+        self.txt_senha.pack(fill="x", pady=(2, 10))
+
+        tk.Label(container, text="Confirmar Senha:*", font=("Segoe UI", 9, "bold"), fg="#475569", bg="#ffffff").pack(anchor="w")
+        self.txt_conf_senha = ttk.Entry(container, show="*", width=32, font=("Segoe UI", 10))
+        self.txt_conf_senha.pack(fill="x", pady=(2, 15))
+
+        botoes = tk.Frame(container, bg="#ffffff")
+        botoes.pack(fill="x", pady=(5, 0))
+
+        btn_cadastrar = tk.Button(
+            botoes,
+            text="Cadastrar",
+            font=("Segoe UI", 10, "bold"),
+            bg="#2563eb",
+            fg="#ffffff",
+            activebackground="#1d4ed8",
+            activeforeground="#ffffff",
+            relief="flat",
+            cursor="hand2",
+            padx=12,
+            pady=6,
+            command=self._cadastrar
+        )
+        btn_cadastrar.pack(side="right", padx=(5, 0))
+
+        btn_cancelar = tk.Button(
+            botoes,
+            text="Cancelar",
+            font=("Segoe UI", 10),
+            bg="#e2e8f0",
+            fg="#334155",
+            relief="flat",
+            cursor="hand2",
+            padx=12,
+            pady=6,
+            command=self.destroy
+        )
+        btn_cancelar.pack(side="right")
+
+    def _cadastrar(self):
+        nome = self.txt_nome.get().strip()
+        login = self.txt_login.get().strip().lower()
+        cargo = self.combo_cargo.get().strip()
+        senha = self.txt_senha.get()
+        conf_senha = self.txt_conf_senha.get()
+
+        if not nome or not login or not senha:
+            messagebox.showwarning("Aviso", "Preencha todos os campos obrigatórios!", parent=self)
+            return
+
+        if senha != conf_senha:
+            messagebox.showwarning("Aviso", "A confirmação da senha não confere!", parent=self)
+            return
+
+        try:
+            auth_service.cadastrar_usuario(nome, login, senha, cargo)
+            messagebox.showinfo("Sucesso", f"Usuário '{login}' cadastrado com sucesso! Agora você já pode fazer login.", parent=self)
+            self.destroy()
+        except ValueError as ve:
+            messagebox.showwarning("Aviso", str(ve), parent=self)
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao cadastrar usuário: {e}", parent=self)
+
+
+# =============================================================================
+# JANELA DE LOGIN
+# =============================================================================
+class JanelaLogin(tk.Tk):
     def __init__(self):
         super().__init__()
+        self.title("Acesso ao Sistema - Biblioteca")
+        self.geometry("420x540")
+        self.resizable(False, False)
+        self.configure(bg="#0f172a")
+
+        # Centralizar na tela
+        largura, altura = 420, 540
+        pos_x = (self.winfo_screenwidth() // 2) - (largura // 2)
+        pos_y = (self.winfo_screenheight() // 2) - (altura // 2)
+        self.geometry(f"{largura}x{altura}+{pos_x}+{pos_y}")
+
+        self._criar_interface()
+
+    def _criar_interface(self):
+        # Card Central
+        card = tk.Frame(self, bg="#ffffff", padx=30, pady=30, relief="flat")
+        card.pack(fill="both", expand=True, padx=20, pady=20)
+
+        # Cabeçalho do Card
+        lbl_icone = tk.Label(card, text="📚", font=("Segoe UI Emoji", 34), bg="#ffffff")
+        lbl_icone.pack(pady=(0, 2))
+
+        lbl_titulo = tk.Label(card, text="Sistema de Biblioteca", font=("Segoe UI", 16, "bold"), fg="#0f172a", bg="#ffffff")
+        lbl_titulo.pack()
+
+        lbl_sub = tk.Label(card, text="Informe suas credenciais para continuar", font=("Segoe UI", 9), fg="#64748b", bg="#ffffff")
+        lbl_sub.pack(pady=(2, 20))
+
+        # Mensagem de Erro Dinâmica
+        self.lbl_erro = tk.Label(card, text="", font=("Segoe UI", 9, "bold"), fg="#dc2626", bg="#ffffff")
+        self.lbl_erro.pack(pady=(0, 5))
+
+        # Campos
+        frame_campos = tk.Frame(card, bg="#ffffff")
+        frame_campos.pack(fill="x")
+
+        tk.Label(frame_campos, text="Usuário", font=("Segoe UI", 10, "bold"), fg="#334155", bg="#ffffff").pack(anchor="w")
+        self.txt_login = tk.Entry(
+            frame_campos, 
+            font=("Segoe UI", 11), 
+            relief="solid", 
+            bd=1, 
+            highlightthickness=1, 
+            highlightcolor="#2563eb", 
+            highlightbackground="#cbd5e1"
+        )
+        self.txt_login.pack(fill="x", ipady=5, pady=(4, 12))
+        self.txt_login.focus_set()
+
+        tk.Label(frame_campos, text="Senha", font=("Segoe UI", 10, "bold"), fg="#334155", bg="#ffffff").pack(anchor="w")
+        self.txt_senha = tk.Entry(
+            frame_campos, 
+            font=("Segoe UI", 11), 
+            show="•", 
+            relief="solid", 
+            bd=1, 
+            highlightthickness=1, 
+            highlightcolor="#2563eb", 
+            highlightbackground="#cbd5e1"
+        )
+        self.txt_senha.pack(fill="x", ipady=5, pady=(4, 6))
+
+        # Opção mostrar senha
+        self.var_mostrar = tk.BooleanVar(value=False)
+        chk_mostrar = tk.Checkbutton(
+            frame_campos,
+            text="Mostrar senha",
+            variable=self.var_mostrar,
+            font=("Segoe UI", 9),
+            fg="#64748b",
+            bg="#ffffff",
+            activebackground="#ffffff",
+            command=self._alternar_senha
+        )
+        chk_mostrar.pack(anchor="w", pady=(0, 15))
+
+        # Botão Entrar
+        btn_entrar = tk.Button(
+            card,
+            text="Entrar no Sistema",
+            font=("Segoe UI", 11, "bold"),
+            bg="#2563eb",
+            fg="#ffffff",
+            activebackground="#1d4ed8",
+            activeforeground="#ffffff",
+            relief="flat",
+            cursor="hand2",
+            pady=8,
+            command=self._fazer_login
+        )
+        btn_entrar.pack(fill="x")
+
+        # Botão Cadastrar Usuário
+        btn_novo_usuario = tk.Button(
+            card,
+            text="Criar Novo Usuário",
+            font=("Segoe UI", 9),
+            bg="#ffffff",
+            fg="#2563eb",
+            activebackground="#ffffff",
+            activeforeground="#1d4ed8",
+            relief="flat",
+            cursor="hand2",
+            bd=0,
+            command=self._abrir_cadastro
+        )
+        btn_novo_usuario.pack(pady=(10, 0))
+
+        # Dica de acesso padrão
+        lbl_dica = tk.Label(
+            card,
+            text="💡 Padrão inicial: Usuário admin | Senha admin123",
+            font=("Segoe UI", 8),
+            fg="#94a3b8",
+            bg="#ffffff"
+        )
+        lbl_dica.pack(side="bottom", pady=(15, 0))
+
+        # Atalho de teclado Enter para submeter
+        self.txt_login.bind("<Return>", lambda e: self._fazer_login())
+        self.txt_senha.bind("<Return>", lambda e: self._fazer_login())
+
+    def _alternar_senha(self):
+        if self.var_mostrar.get():
+            self.txt_senha.config(show="")
+        else:
+            self.txt_senha.config(show="•")
+
+    def _abrir_cadastro(self):
+        JanelaCadastroUsuario(self)
+
+    def _fazer_login(self):
+        login = self.txt_login.get().strip()
+        senha = self.txt_senha.get()
+
+        if not login or not senha:
+            self.lbl_erro.config(text="Por favor, informe o usuário e a senha.")
+            return
+
+        self.lbl_erro.config(text="Autenticando...", fg="#2563eb")
+        self.update_idletasks()
+
+        user = auth_service.autenticar_usuario(login, senha)
+        if user:
+            self.destroy()
+            app = BibliotecaApp(usuario_logado=user)
+            app.mainloop()
+        else:
+            self.lbl_erro.config(text="Usuário ou senha incorretos!", fg="#dc2626")
+            self.txt_senha.delete(0, tk.END)
+            self.txt_senha.focus_set()
+
+
+# =============================================================================
+# JANELA PRINCIPAL DA APLICAÇÃO
+# =============================================================================
+class BibliotecaApp(tk.Tk):
+    def __init__(self, usuario_logado: dict = None):
+        super().__init__()
+        self.usuario_logado = usuario_logado or {"nome": "Administrador", "login": "admin", "cargo": "Administrador"}
+        
         self.title("Sistema de Gestão de Biblioteca - PostgreSQL")
-        self.geometry("980x680")
-        self.minsize(850, 550)
+        self.geometry("1020x700")
+        self.minsize(880, 580)
 
         # Configurar Estilos ttk
         self.style = ttk.Style(self)
@@ -28,38 +299,76 @@ class BibliotecaApp(tk.Tk):
         self.style.configure("Primary.TButton", font=("Segoe UI", 10, "bold"), background="#0366d6", foreground="#ffffff")
         self.style.map("Primary.TButton", background=[("active", "#0056b3")])
 
-        # Criação dos Componentes Principais
+        # Componentes Principais
         self._criar_cabecalho()
         self._criar_abas()
         self._carregar_dados_iniciais()
 
     def _criar_cabecalho(self):
-        header = tk.Frame(self, bg="#1f2937", height=60)
+        header = tk.Frame(self, bg="#1f2937", height=65)
         header.pack(fill="x", side="top")
 
+        frame_esquerda = tk.Frame(header, bg="#1f2937")
+        frame_esquerda.pack(side="left", padx=20, pady=12)
+
         titulo = tk.Label(
-            header,
+            frame_esquerda,
             text="📚 Sistema de Biblioteca",
-            font=("Segoe UI", 16, "bold"),
+            font=("Segoe UI", 15, "bold"),
             fg="#ffffff",
             bg="#1f2937"
         )
-        titulo.pack(side="left", padx=20, pady=12)
+        titulo.pack(side="left")
+
+        frame_direita = tk.Frame(header, bg="#1f2937")
+        frame_direita.pack(side="right", padx=20, pady=12)
 
         self.lbl_status_db = tk.Label(
-            header,
-            text="Verificando conexão...",
+            frame_direita,
+            text="Verificando banco...",
             font=("Segoe UI", 9),
             fg="#9ca3af",
             bg="#1f2937"
         )
-        self.lbl_status_db.pack(side="right", padx=20, pady=15)
+        self.lbl_status_db.pack(side="left", padx=(0, 15))
+
+        nome_user = self.usuario_logado.get("nome", "Usuário")
+        cargo_user = self.usuario_logado.get("cargo", "Operador")
+        lbl_usuario = tk.Label(
+            frame_direita,
+            text=f"👤 {nome_user} ({cargo_user})",
+            font=("Segoe UI", 9, "bold"),
+            fg="#38bdf8",
+            bg="#1f2937"
+        )
+        lbl_usuario.pack(side="left", padx=(0, 12))
+
+        btn_logout = tk.Button(
+            frame_direita,
+            text="Sair ⮞",
+            font=("Segoe UI", 8, "bold"),
+            bg="#374151",
+            fg="#f3f4f6",
+            activebackground="#ef4444",
+            activeforeground="#ffffff",
+            relief="flat",
+            cursor="hand2",
+            padx=8,
+            pady=3,
+            command=self._logout
+        )
+        btn_logout.pack(side="left")
+
+    def _logout(self):
+        if messagebox.askyesno("Logout", "Deseja realmente encerrar a sessão e voltar para a tela de login?"):
+            self.destroy()
+            janela_login = JanelaLogin()
+            janela_login.mainloop()
 
     def _criar_abas(self):
         self.notebook = ttk.Notebook(self)
         self.notebook.pack(fill="both", expand=True, padx=15, pady=10)
 
-        # Abas
         self.tab_livros = ttk.Frame(self.notebook, padding=10)
         self.tab_alunos = ttk.Frame(self.notebook, padding=10)
         self.tab_emprestimos = ttk.Frame(self.notebook, padding=10)
@@ -68,7 +377,7 @@ class BibliotecaApp(tk.Tk):
         self.notebook.add(self.tab_livros, text=" 📖 Livros ")
         self.notebook.add(self.tab_alunos, text=" 🎓 Alunos ")
         self.notebook.add(self.tab_emprestimos, text=" 🔄 Empréstimos ")
-        self.notebook.add(self.tab_info, text=" ⚙️ Informações & Banco ")
+        self.notebook.add(self.tab_info, text=" ⚙️ Usuários & Banco ")
 
         self._montar_aba_livros()
         self._montar_aba_alunos()
@@ -79,7 +388,6 @@ class BibliotecaApp(tk.Tk):
     # ABA LIVROS
     # =========================================================================
     def _montar_aba_livros(self):
-        # Formulário
         form = ttk.LabelFrame(self.tab_livros, text="Dados do Livro", padding=10)
         form.pack(fill="x", side="top", pady=5)
 
@@ -104,7 +412,6 @@ class BibliotecaApp(tk.Tk):
         self.txt_livro_qtd.set(1)
         self.txt_livro_qtd.grid(row=1, column=3, sticky="e", padx=5, pady=5)
 
-        # Botões Livro
         botoes = ttk.Frame(form)
         botoes.grid(row=1, column=4, columnspan=2, sticky="e", padx=5, pady=5)
 
@@ -112,7 +419,6 @@ class BibliotecaApp(tk.Tk):
         ttk.Button(botoes, text="Limpar", command=self._limpar_form_livro).pack(side="left", padx=4)
         ttk.Button(botoes, text="Excluir", command=self._excluir_livro).pack(side="left", padx=4)
 
-        # Tabela Livros
         tabela_frame = ttk.Frame(self.tab_livros)
         tabela_frame.pack(fill="both", expand=True, pady=10)
 
@@ -157,7 +463,7 @@ class BibliotecaApp(tk.Tk):
             if qtd < 1:
                 raise ValueError()
         except ValueError:
-            messagebox.showwarning("Aviso", "A quantidade de exemplares deve ser um número inteiro maior ou igual a 1.")
+            messagebox.showwarning("Aviso", "A quantidade de exemplares deve ser um número maior ou igual a 1.")
             return
 
         try:
@@ -178,7 +484,7 @@ class BibliotecaApp(tk.Tk):
         if not id_str:
             messagebox.showwarning("Aviso", "Selecione um livro na tabela para excluir.")
             return
-        if messagebox.askyesno("Confirmar Exclusão", f"Deseja realmente excluir o livro de ID {id_str}?"):
+        if messagebox.askyesno("Confirmar Exclusão", f"Deseja realmente excluir o livro ID {id_str}?"):
             try:
                 livro_service.excluir_livro(int(id_str))
                 messagebox.showinfo("Sucesso", "Livro excluído com sucesso!")
@@ -201,15 +507,15 @@ class BibliotecaApp(tk.Tk):
         item = self.grid_livros.selection()
         if not item:
             return
-        valores = self.grid_livros.item(item[0], "values")
+        v = self.grid_livros.item(item[0], "values")
         self._limpar_form_livro()
         self.txt_livro_id.config(state="normal")
-        self.txt_livro_id.insert(0, valores[0])
+        self.txt_livro_id.insert(0, v[0])
         self.txt_livro_id.config(state="readonly")
-        self.txt_livro_titulo.insert(0, valores[1])
-        self.txt_livro_autor.insert(0, valores[2])
-        self.txt_livro_isbn.insert(0, valores[3] if valores[3] != "None" else "")
-        self.txt_livro_qtd.set(valores[4])
+        self.txt_livro_titulo.insert(0, v[1])
+        self.txt_livro_autor.insert(0, v[2])
+        self.txt_livro_isbn.insert(0, v[3] if v[3] != "-" else "")
+        self.txt_livro_qtd.set(v[4])
 
     def _carregar_livros(self):
         for row in self.grid_livros.get_children():
@@ -400,7 +706,6 @@ class BibliotecaApp(tk.Tk):
             command=self._realizar_emprestimo
         ).grid(row=0, column=6, sticky="e", padx=10, pady=5)
 
-        # Barra de Ações para Empréstimos Existentes
         barra_filtro = ttk.Frame(self.tab_emprestimos)
         barra_filtro.pack(fill="x", pady=6)
 
@@ -419,7 +724,6 @@ class BibliotecaApp(tk.Tk):
             command=self._registrar_devolucao
         ).pack(side="right", padx=5)
 
-        # Tabela Empréstimos
         tabela_frame = ttk.Frame(self.tab_emprestimos)
         tabela_frame.pack(fill="both", expand=True, pady=5)
 
@@ -494,7 +798,6 @@ class BibliotecaApp(tk.Tk):
             self._carregar_livros()
             self._atualizar_combos_emprestimo()
         except ValueError as ve:
-            # Exibe mensagem amigável quando a trigger de estoque bloqueia
             messagebox.showwarning("Operação Bloqueada pelo Banco", str(ve))
         except Exception as e:
             messagebox.showerror("Erro ao realizar empréstimo", str(e))
@@ -547,32 +850,41 @@ class BibliotecaApp(tk.Tk):
             print("Erro ao carregar empréstimos:", e)
 
     # =========================================================================
-    # ABA INFORMAÇÕES & BANCO DE DADOS
+    # ABA INFORMAÇÕES, USUÁRIOS & BANCO DE DADOS
     # =========================================================================
     def _montar_aba_info(self):
-        card = ttk.LabelFrame(self.tab_info, text="Conexão com o Banco de Dados", padding=15)
-        card.pack(fill="x", pady=10)
+        card_usuario = ttk.LabelFrame(self.tab_info, text="Operador Atual", padding=12)
+        card_usuario.pack(fill="x", pady=5)
+
+        nome = self.usuario_logado.get("nome", "Admin")
+        login = self.usuario_logado.get("login", "admin")
+        cargo = self.usuario_logado.get("cargo", "Administrador")
+
+        txt_user = f"• Nome: {nome}   |   Login: {login}   |   Cargo: {cargo}"
+        ttk.Label(card_usuario, text=txt_user, font=("Segoe UI", 10, "bold"), foreground="#0284c7").pack(anchor="w")
+
+        frame_btn_user = ttk.Frame(card_usuario)
+        frame_btn_user.pack(fill="x", pady=(8, 0))
+        ttk.Button(frame_btn_user, text="➕ Cadastrar Outro Usuário", command=lambda: JanelaCadastroUsuario(self)).pack(side="left")
+
+        card_db = ttk.LabelFrame(self.tab_info, text="Conexão com o Banco de Dados", padding=12)
+        card_db.pack(fill="x", pady=8)
 
         info_text = (
-            f"• Host: {DB_HOST}\n"
-            f"• Porta: {DB_PORT}\n"
-            f"• Banco de Dados: {DB_NAME}\n"
-            f"• Usuário: {DB_USER}\n"
-            f"• Status de Conexão: Verificado com Sucesso\n"
+            f"• Host: {DB_HOST}   |   Porta: {DB_PORT}   |   Banco: {DB_NAME}\n"
+            f"• Usuário PostgreSQL: {DB_USER}\n"
         )
-        ttk.Label(card, text=info_text, font=("Consolas", 10), justify="left").pack(anchor="w", pady=5)
+        ttk.Label(card_db, text=info_text, font=("Consolas", 10), justify="left").pack(anchor="w", pady=2)
+        ttk.Button(card_db, text="Testar Conexão Novamente", command=self._testar_conexao_manual).pack(anchor="w", pady=4)
 
-        ttk.Button(card, text="Testar Conexão Novamente", command=self._testar_conexao_manual).pack(anchor="w", pady=5)
-
-        card_ajuda = ttk.LabelFrame(self.tab_info, text="Regras de Negócio e Triggers", padding=15)
-        card_ajuda.pack(fill="both", expand=True, pady=10)
+        card_ajuda = ttk.LabelFrame(self.tab_info, text="Regras de Negócio e Segurança", padding=12)
+        card_ajuda.pack(fill="both", expand=True, pady=5)
 
         ajuda_text = (
-            "1. Tabela 'alunos': Guarda os alunos cadastrados com controle de matrícula única.\n"
-            "2. Tabela 'livros': Guarda os livros e a quantidade total de exemplares no acervo.\n"
-            "3. Tabela 'emprestimos': Registra os empréstimos e a data prevista de devolução.\n"
-            "4. Trigger 'trg_valida_emprestimo': Implementada no PostgreSQL, bloqueia novos empréstimos\n"
-            "   caso todos os exemplares daquele livro já estejam emprestados e não devolvidos."
+            "1. Autenticação: Todas as senhas são armazenadas com hash criptográfico SHA-256 e salt.\n"
+            "2. Livros & Acervo: A trigger 'trg_valida_emprestimo' valida se existem cópias disponíveis.\n"
+            "3. Alunos & Empréstimos: A trigger 'trg_valida_exclusao_aluno' impede a exclusão de aluno com\n"
+            "   empréstimos em aberto, e permite a exclusão caso tudo já tenha sido devolvido."
         )
         ttk.Label(card_ajuda, text=ajuda_text, font=("Segoe UI", 10), justify="left").pack(anchor="w", pady=5)
 
@@ -591,7 +903,7 @@ class BibliotecaApp(tk.Tk):
     def _carregar_dados_iniciais(self):
         ok, msg = test_connection()
         if ok:
-            self.lbl_status_db.config(text="● Banco Conectado (biblioteca)", fg="#10b981")
+            self.lbl_status_db.config(text="● Conectado (biblioteca)", fg="#10b981")
             self._carregar_livros()
             self._carregar_alunos()
             self._carregar_emprestimos()
@@ -601,6 +913,10 @@ class BibliotecaApp(tk.Tk):
             messagebox.showwarning("Aviso de Conexão", f"Não foi possível conectar ao PostgreSQL:\n{msg}")
 
 
+def main():
+    login_app = JanelaLogin()
+    login_app.mainloop()
+
+
 if __name__ == "__main__":
-    app = BibliotecaApp()
-    app.mainloop()
+    main()

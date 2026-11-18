@@ -10,13 +10,23 @@ O sistema oferece tanto uma **Interface Gráfica (Desktop - Tkinter)** moderna e
 
 O banco de dados `biblioteca` possui as seguintes tabelas e regras:
 
+0. **`usuarios`**: Controle de acesso ao sistema (login, senha criptografada com salt e SHA-256, cargo e data de cadastro).
 1. **`alunos`**: Cadastro de alunos com controle de matrícula única, e-mail e telefone.
 2. **`livros`**: Cadastro de obras com controle de quantidade total de exemplares no acervo físico.
 3. **`emprestimos`**: Registro do vínculo entre aluno e livro, data de empréstimo, previsão de devolução, data efetiva de entrega e status (`EMPRESTADO` / `DEVOLVIDO`).
 4. **Trigger `trg_valida_emprestimo`**: Validação ativa no PostgreSQL que impede o empréstimo de um livro caso todos os seus exemplares já estejam em posse de outros alunos.
 5. **Trigger `trg_valida_exclusao_aluno`**: Permite a exclusão de alunos caso todos os seus empréstimos constem como `DEVOLVIDO` (removendo os registros de vínculo devolvidos para liberar a chave estrangeira). Se o aluno ainda tiver qualquer livro em posse (status `EMPRESTADO`), a exclusão é bloqueada.
 
-O script SQL completo com a criação das tabelas e a trigger está disponível no arquivo [`schema.sql`](file:///c:/Users/4inet/Desktop/Redes/schema.sql).
+---
+
+## 🔐 Acesso e Credenciais Iniciais
+
+Ao abrir o sistema pela primeira vez, utilize o usuário administrador padrão:
+
+- **Usuário:** `admin`
+- **Senha:** `admin123`
+
+Você pode cadastrar novos usuários e operadores a qualquer momento diretamente pela **Tela de Login** (botão *"Criar Novo Usuário"*) ou pela aba **"⚙️ Usuários & Banco"**.
 
 ---
 
@@ -29,10 +39,11 @@ Redes/
 │   └── settings.json            # Apontamento do interpretador Python
 ├── services/
 │   ├── __init__.py
+│   ├── auth_service.py          # Autenticação, hash SHA-256 e gestão de usuários
 │   ├── aluno_service.py         # CRUD e buscas de Alunos
 │   ├── livro_service.py         # CRUD, buscas e cálculo de estoque de Livros
 │   └── emprestimo_service.py    # Empréstimos, devoluções e regras de negócio
-├── app_gui.py                   # Interface Gráfica Desktop (Tkinter / ttk)
+├── app_gui.py                   # Interface Gráfica Desktop (Tela de Login + Sistema)
 ├── main.py                      # Menu interativo no Terminal e inicializador
 ├── database.py                  # Gerenciador de conexão com PostgreSQL (psycopg)
 ├── config.py                    # Variáveis de conexão com o banco
