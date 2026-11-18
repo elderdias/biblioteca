@@ -62,6 +62,64 @@ def init_db():
         data_devolucao TIMESTAMP NULL,
         status VARCHAR(20) NOT NULL DEFAULT 'EMPRESTADO'
     );
+
+    -- Trigger para validar quantidade disponível de livros
+    CREATE OR REPLACE FUNCTION fn_valida_emprestimo()
+    RETURNS TRIGGER AS $$
+    DECLARE
+        v_quantidade_total INT;
+        v_emprestimos_ativos INT;
+    BEGIN
+        SELECT quantidade_total INTO v_quantidade_total
+        FROM livros
+        WHERE id_livro = NEW.id_livro;
+
+        SELECT COUNT(*) INTO v_emprestimos_ativos
+        FROM emprestimos
+        WHERE id_livro = NEW.id_livro 
+          AND data_devolucao IS NULL;
+
+        IF v_emprestimos_ativos >= v_quantidade_total THEN
+            RAISE EXCEPTION 'Empréstimo negado: Este livro possui apenas % unidade(s) e já está emprestado! Aguarde a devolução.', v_quantidade_total;
+        END IF;
+
+        RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+
+    DROP TRIGGER IF EXISTS trg_valida_emprestimo ON emprestimos;
+    CREATE TRIGGER trg_valida_emprestimo
+    BEFORE INSERT ON emprestimos
+    FOR EACH ROW
+    EXECUTE FUNCTION fn_valida_emprestimo();
+
+    -- Trigger para validar exclusão de aluno (permite se empréstimos foram devolvidos)
+    CREATE OR REPLACE FUNCTION fn_valida_exclusao_aluno()
+    RETURNS TRIGGER AS $$
+    DECLARE
+        v_emprestimos_ativos INT;
+    BEGIN
+        SELECT COUNT(*) INTO v_emprestimos_ativos
+        FROM emprestimos
+        WHERE id_aluno = OLD.id_aluno 
+          AND (data_devolucao IS NULL OR status != 'DEVOLVIDO');
+
+        IF v_emprestimos_ativos > 0 THEN
+            RAISE EXCEPTION 'Não é possível excluir o aluno "%": existem % empréstimo(s) pendente(s) de devolução!', OLD.nome, v_emprestimos_ativos;
+        END IF;
+
+        -- Remove os registros de empréstimos já devolvidos para permitir a exclusão do aluno
+        DELETE FROM emprestimos WHERE id_aluno = OLD.id_aluno;
+
+        RETURN OLD;
+    END;
+    $$ LANGUAGE plpgsql;
+
+    DROP TRIGGER IF EXISTS trg_valida_exclusao_aluno ON alunos;
+    CREATE TRIGGER trg_valida_exclusao_aluno
+    BEFORE DELETE ON alunos
+    FOR EACH ROW
+    EXECUTE FUNCTION fn_valida_exclusao_aluno();
     """
     with get_connection() as conn:
         with conn.cursor() as cur:

@@ -64,7 +64,36 @@ BEFORE INSERT ON emprestimos
 FOR EACH ROW
 EXECUTE FUNCTION fn_valida_emprestimo();
 
--- 5. DADOS DE EXEMPLO (OPCIONAL)
+-- 5. TRIGGER PARA BLOQUEAR EXCLUSÃO DE ALUNO COM EMPRÉSTIMO ATIVO
+-- (Permite exclusão caso todos os empréstimos estejam DEVOLVIDOS)
+CREATE OR REPLACE FUNCTION fn_valida_exclusao_aluno()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_emprestimos_ativos INT;
+BEGIN
+    SELECT COUNT(*) INTO v_emprestimos_ativos
+    FROM emprestimos
+    WHERE id_aluno = OLD.id_aluno 
+      AND (data_devolucao IS NULL OR status != 'DEVOLVIDO');
+
+    IF v_emprestimos_ativos > 0 THEN
+        RAISE EXCEPTION 'Não é possível excluir o aluno "%": existem % empréstimo(s) pendente(s) de devolução!', OLD.nome, v_emprestimos_ativos;
+    END IF;
+
+    -- Remove o histórico de empréstimos devolvidos para permitir a exclusão do aluno
+    DELETE FROM emprestimos WHERE id_aluno = OLD.id_aluno;
+
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_valida_exclusao_aluno ON alunos;
+CREATE TRIGGER trg_valida_exclusao_aluno
+BEFORE DELETE ON alunos
+FOR EACH ROW
+EXECUTE FUNCTION fn_valida_exclusao_aluno();
+
+-- 6. DADOS DE EXEMPLO (OPCIONAL)
 INSERT INTO alunos (nome, matricula, email, telefone) VALUES 
 ('Lucas Pereira', 'MAT-202401', 'lucas@email.com', '11988881111'),
 ('Mariana Costa', 'MAT-202402', 'mariana@email.com', '11977772222')

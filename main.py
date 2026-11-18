@@ -74,6 +74,8 @@ def menu_alunos():
                         print("✅ Aluno excluído com sucesso!")
                     else:
                         print("❌ Aluno não encontrado.")
+            except ValueError as ve:
+                print(f"\n⚠️  {ve}")
             except Exception as e:
                 print(f"❌ Erro: {e}")
             input("\nPressione ENTER para continuar...")

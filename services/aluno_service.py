@@ -1,3 +1,4 @@
+from psycopg import errors
 from database import get_connection
 
 def listar_alunos():
@@ -60,11 +61,28 @@ def atualizar_aluno(id_aluno: int, nome: str, matricula: str, email: str = None,
         return linhas_afetadas > 0
 
 def excluir_aluno(id_aluno: int):
-    """Exclui um aluno pelo ID."""
+    """
+    Exclui um aluno pelo ID.
+    Graças à trigger no banco de dados:
+    - Se o aluno possuir empréstimos em andamento (não devolvidos), a exclusão é bloqueada.
+    - Se todos os empréstimos já foram devolvidos, o histórico de devoluções é liberado
+      e o aluno é excluído com sucesso.
+    """
     query = "DELETE FROM alunos WHERE id_aluno = %s;"
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(query, (id_aluno,))
-            linhas_afetadas = cur.rowcount
-        conn.commit()
-        return linhas_afetadas > 0
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, (id_aluno,))
+                linhas_afetadas = cur.rowcount
+            conn.commit()
+            if linhas_afetadas == 0:
+                raise ValueError("Aluno não encontrado no banco de dados.")
+            return True
+    except errors.RaiseException as e:
+        # Mensagem vinda da trigger fn_valida_exclusao_aluno()
+        msg = e.diag.message_primary if hasattr(e, 'diag') and e.diag else str(e)
+        raise ValueError(msg)
+    except errors.ForeignKeyViolation:
+        raise ValueError("Não é possível excluir o aluno pois existem registros vinculados a ele.")
+    except Exception as e:
+        raise RuntimeError(f"Erro ao excluir aluno: {e}")

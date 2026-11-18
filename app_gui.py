@@ -325,7 +325,10 @@ class BibliotecaApp(tk.Tk):
                 messagebox.showinfo("Sucesso", "Aluno excluído com sucesso!")
                 self._limpar_form_aluno()
                 self._carregar_alunos()
+                self._carregar_emprestimos()
                 self._atualizar_combos_emprestimo()
+            except ValueError as ve:
+                messagebox.showwarning("Exclusão Não Permitida", str(ve))
             except Exception as e:
                 messagebox.showerror("Erro", f"Não foi possível excluir o aluno: {e}")
 

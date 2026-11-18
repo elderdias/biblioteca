@@ -14,6 +14,7 @@ O banco de dados `biblioteca` possui as seguintes tabelas e regras:
 2. **`livros`**: Cadastro de obras com controle de quantidade total de exemplares no acervo físico.
 3. **`emprestimos`**: Registro do vínculo entre aluno e livro, data de empréstimo, previsão de devolução, data efetiva de entrega e status (`EMPRESTADO` / `DEVOLVIDO`).
 4. **Trigger `trg_valida_emprestimo`**: Validação ativa no PostgreSQL que impede o empréstimo de um livro caso todos os seus exemplares já estejam em posse de outros alunos.
+5. **Trigger `trg_valida_exclusao_aluno`**: Permite a exclusão de alunos caso todos os seus empréstimos constem como `DEVOLVIDO` (removendo os registros de vínculo devolvidos para liberar a chave estrangeira). Se o aluno ainda tiver qualquer livro em posse (status `EMPRESTADO`), a exclusão é bloqueada.
 
 O script SQL completo com a criação das tabelas e a trigger está disponível no arquivo [`schema.sql`](file:///c:/Users/4inet/Desktop/Redes/schema.sql).
 
