@@ -2,7 +2,9 @@
 
 Sistema completo desenvolvido em Python para cadastro, consulta e controle de fluxo de uma biblioteca integrada a um banco de dados relacional **PostgreSQL** (banco `biblioteca`).
 
-O sistema oferece tanto uma **Interface Gráfica (Desktop - Tkinter)** moderna e intuitiva, quanto um **Terminal Interativo (CLI)** para manipulação dos dados diretamente pelo console do Visual Studio / VS Code.
+O sistema oferece tanto uma **Interface Gráfica (Desktop - Tkinter)** moderna e intuitiva, um **Terminal Interativo (CLI)** para manipulação dos dados diretamente pelo console do Visual Studio / VS Code, quanto uma versão **Web Interativa no GitHub Pages**.
+
+🔗 **Demonstração Online no GitHub Pages:** [https://elderdias.github.io/biblioteca/](https://elderdias.github.io/biblioteca/)
 
 ---
 
@@ -46,6 +48,7 @@ Redes/
 │   └── relatorio_service.py     # Relatórios, filtros dinâmicos e exportações (CSV/HTML)
 ├── app_gui.py                   # Interface Gráfica Desktop (Login + Abas + Relatórios)
 ├── main.py                      # Menu interativo no Terminal e inicializador
+├── index.html                   # Aplicação Web para GitHub Pages
 ├── database.py                  # Gerenciador de conexão com PostgreSQL (psycopg)
 ├── config.py                    # Variáveis de conexão com o banco
 ├── schema.sql                   # DDL das tabelas, triggers e dados iniciais

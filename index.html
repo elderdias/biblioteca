@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Gestão de Biblioteca</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background: white !important; }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col">
+
+    <!-- ========================================== -->
+    <!-- TELA DE LOGIN (QUANDO NÃO AUTENTICADO)     -->
+    <!-- ========================================== -->
+    <div id="view-login" class="flex-1 flex items-center justify-center p-4 bg-slate-900">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 border border-slate-200">
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-3 shadow-inner">
+                    📚
+                </div>
+                <h1 class="text-2xl font-bold text-slate-900">Sistema de Biblioteca</h1>
+                <p class="text-sm text-slate-500 mt-1">Informe suas credenciais para continuar</p>
+            </div>
+
+            <div id="login-alerta" class="hidden mb-4 p-3 rounded-lg text-sm font-medium bg-red-50 text-red-700 border border-red-200"></div>
+
+            <form id="form-login" onsubmit="app.fazerLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Usuário</label>
+                    <input type="text" id="login-usuario" required class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="Ex: admin">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Senha</label>
+                    <input type="password" id="login-senha" required class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="••••••••">
+                </div>
+                <div class="flex items-center justify-between text-xs text-slate-500">
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" onchange="document.getElementById('login-senha').type = this.checked ? 'text' : 'password'" class="rounded text-blue-600">
+                        Mostrar senha
+                    </label>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg shadow-md hover:shadow-lg transition">
+                    Entrar no Sistema
+                </button>
+            </form>
+
+            <div class="mt-6 pt-6 border-t border-slate-100 flex flex-col items-center gap-2">
+                <button onclick="app.abrirModalCadastroUsuario()" class="text-xs text-blue-600 hover:underline font-semibold">
+                    + Criar Novo Usuário
+                </button>
+                <span class="text-[11px] text-slate-400 bg-slate-50 px-3 py-1 rounded-full border border-slate-200">
+                    💡 Padrão inicial: Usuário <b>admin</b> | Senha <b>admin123</b>
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- APLICAÇÃO PRINCIPAL (APÓS LOGIN)          -->
+    <!-- ========================================== -->
+    <div id="view-app" class="hidden flex-1 flex flex-col">
+        <!-- Top Navbar -->
+        <header class="bg-slate-900 text-white shadow-md sticky top-0 z-30 no-print">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl">📚</span>
+                    <div>
+                        <span class="font-bold text-lg leading-none block">Sistema de Biblioteca</span>
+                        <span class="text-[11px] text-slate-400">PostgreSQL Architecture Demo</span>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-4">
+                    <div class="text-right hidden sm:block">
+                        <span id="user-display-name" class="block text-sm font-semibold text-blue-300">Admin</span>
+                        <span id="user-display-role" class="block text-xs text-slate-400">Administrador</span>
+                    </div>
+                    <button onclick="app.logout()" class="bg-slate-800 hover:bg-red-600 text-slate-200 hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition border border-slate-700 hover:border-red-500">
+                        Sair ⮞
+                    </button>
+                </div>
+            </div>
+
+            <!-- Navegação por Abas -->
+            <div class="bg-slate-800 border-t border-slate-700/60 px-4 sm:px-8 flex space-x-1 sm:space-x-3 overflow-x-auto text-sm">
+                <button onclick="app.trocarAba('livros')" id="tab-btn-livros" class="tab-btn py-3 px-3 font-medium text-slate-300 hover:text-white border-b-2 border-transparent transition flex items-center gap-1.5">
+                    📖 Livros
+                </button>
+                <button onclick="app.trocarAba('alunos')" id="tab-btn-alunos" class="tab-btn py-3 px-3 font-medium text-slate-300 hover:text-white border-b-2 border-transparent transition flex items-center gap-1.5">
+                    🎓 Alunos
+                </button>
+                <button onclick="app.trocarAba('emprestimos')" id="tab-btn-emprestimos" class="tab-btn py-3 px-3 font-medium text-slate-300 hover:text-white border-b-2 border-transparent transition flex items-center gap-1.5">
+                    🔄 Empréstimos
+                </button>
+                <button onclick="app.trocarAba('relatorios')" id="tab-btn-relatorios" class="tab-btn py-3 px-3 font-medium text-slate-300 hover:text-white border-b-2 border-transparent transition flex items-center gap-1.5">
+                    📊 Relatórios
+                </button>
+                <button onclick="app.trocarAba('sobre')" id="tab-btn-sobre" class="tab-btn py-3 px-3 font-medium text-slate-300 hover:text-white border-b-2 border-transparent transition flex items-center gap-1.5">
+                    ⚙️ Sobre & BD
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+            
+            <!-- ABA 1: LIVROS -->
+            <section id="aba-livros" class="aba-conteudo space-y-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h2 class="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                        <span>📖</span> Cadastrar / Atualizar Livro
+                    </h2>
+                    <form id="form-livro" onsubmit="app.salvarLivro(event)" class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                        <input type="hidden" id="livro-id">
+                        <div class="md:col-span-5">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Título *</label>
+                            <input type="text" id="livro-titulo" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm" placeholder="Ex: Redes de Computadores">
+                        </div>
+                        <div class="md:col-span-3">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Autor *</label>
+                            <input type="text" id="livro-autor" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm" placeholder="Ex: Andrew Tanenbaum">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">ISBN</label>
+                            <input type="text" id="livro-isbn" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm" placeholder="978-...">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Qtd Total *</label>
+                            <input type="number" id="livro-qtd" min="1" value="1" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+                        </div>
+                        <div class="md:col-span-12 flex justify-end gap-2 pt-2">
+                            <button type="button" onclick="app.limparFormLivro()" class="px-4 py-2 text-sm rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition">Limpar</button>
+                            <button type="submit" class="px-5 py-2 text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition">Salvar Livro</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Tabela Livros -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                        <h3 class="font-bold text-slate-800 text-sm">Livros no Acervo</h3>
+                        <span id="contagem-livros" class="text-xs text-slate-500">0 livros</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-slate-100 text-slate-600 uppercase text-[11px] font-semibold border-b">
+                                <tr>
+                                    <th class="py-3 px-4">ID</th>
+                                    <th class="py-3 px-4">Título</th>
+                                    <th class="py-3 px-4">Autor</th>
+                                    <th class="py-3 px-4">ISBN</th>
+                                    <th class="py-3 px-4 text-center">Total</th>
+                                    <th class="py-3 px-4 text-center">Emprestados</th>
+                                    <th class="py-3 px-4 text-center">Disponíveis</th>
+                                    <th class="py-3 px-4 text-right">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-livros" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 2: ALUNOS -->
+            <section id="aba-alunos" class="aba-conteudo hidden space-y-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h2 class="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                        <span>🎓</span> Cadastrar / Atualizar Aluno
+                    </h2>
+                    <form id="form-aluno" onsubmit="app.salvarAluno(event)" class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                        <input type="hidden" id="aluno-id">
+                        <div class="md:col-span-4">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Nome Completo *</label>
+                            <input type="text" id="aluno-nome" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm" placeholder="Ex: Lucas Pereira">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Matrícula *</label>
+                            <input type="text" id="aluno-matricula" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm" placeholder="MAT-202401">
+                        </div>
+                        <div class="md:col-span-3">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">E-mail</label>
+                            <input type="email" id="aluno-email" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm" placeholder="lucas@email.com">
+                        </div>
+                        <div class="md:col-span-3">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Telefone</label>
+                            <input type="text" id="aluno-telefone" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm" placeholder="(11) 98888-1111">
+                        </div>
+                        <div class="md:col-span-12 flex justify-end gap-2 pt-2">
+                            <button type="button" onclick="app.limparFormAluno()" class="px-4 py-2 text-sm rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition">Limpar</button>
+                            <button type="submit" class="px-5 py-2 text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition">Salvar Aluno</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Tabela Alunos -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                        <h3 class="font-bold text-slate-800 text-sm">Alunos Cadastrados</h3>
+                        <span id="contagem-alunos" class="text-xs text-slate-500">0 alunos</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-slate-100 text-slate-600 uppercase text-[11px] font-semibold border-b">
+                                <tr>
+                                    <th class="py-3 px-4">ID</th>
+                                    <th class="py-3 px-4">Nome Completo</th>
+                                    <th class="py-3 px-4">Matrícula</th>
+                                    <th class="py-3 px-4">E-mail</th>
+                                    <th class="py-3 px-4">Telefone</th>
+                                    <th class="py-3 px-4 text-right">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-alunos" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 3: EMPRÉSTIMOS -->
+            <section id="aba-emprestimos" class="aba-conteudo hidden space-y-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h2 class="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                        <span>🔄</span> Realizar Novo Empréstimo
+                    </h2>
+                    <form id="form-emprestimo" onsubmit="app.realizarEmprestimo(event)" class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                        <div class="md:col-span-5">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Aluno *</label>
+                            <select id="emp-aluno" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white"></select>
+                        </div>
+                        <div class="md:col-span-5">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Livro *</label>
+                            <select id="emp-livro" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white"></select>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Prazo (Dias)</label>
+                            <input type="number" id="emp-dias" min="1" max="60" value="7" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+                        </div>
+                        <div class="md:col-span-12 flex justify-end gap-2 pt-2">
+                            <button type="submit" class="px-6 py-2.5 text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition">
+                                Confirmar Empréstimo
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Lista Empréstimos -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="p-4 border-b border-slate-200 flex flex-wrap justify-between items-center gap-3 bg-slate-50">
+                        <div class="flex items-center gap-3">
+                            <h3 class="font-bold text-slate-800 text-sm">Controle de Empréstimos</h3>
+                            <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                                <input type="checkbox" id="filtro-emp-ativos" onchange="app.renderizarEmprestimos()" class="rounded text-blue-600">
+                                Mostrar apenas ativos
+                            </label>
+                        </div>
+                        <span id="contagem-emprestimos" class="text-xs text-slate-500">0 empréstimos</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-slate-100 text-slate-600 uppercase text-[11px] font-semibold border-b">
+                                <tr>
+                                    <th class="py-3 px-4">ID</th>
+                                    <th class="py-3 px-4">Aluno</th>
+                                    <th class="py-3 px-4">Livro</th>
+                                    <th class="py-3 px-4">Empréstimo</th>
+                                    <th class="py-3 px-4">Previsão</th>
+                                    <th class="py-3 px-4">Devolução</th>
+                                    <th class="py-3 px-4 text-center">Status</th>
+                                    <th class="py-3 px-4 text-right">Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-emprestimos" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 4: RELATÓRIOS -->
+            <section id="aba-relatorios" class="aba-conteudo hidden space-y-6">
+                <!-- Filtros -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 no-print">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                            <span>📊</span> Filtros do Relatório de Empréstimos
+                        </h2>
+                        <div class="flex gap-2">
+                            <button onclick="app.exportarRelatorioCSV()" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition flex items-center gap-1">
+                                📥 Exportar CSV
+                            </button>
+                            <button onclick="window.print()" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-sky-600 hover:bg-sky-700 text-white shadow-sm transition flex items-center gap-1">
+                                🖨️ Imprimir / PDF
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Filtrar por Aluno</label>
+                            <select id="rel-aluno" onchange="app.gerarRelatorio()" class="w-full px-3 py-2 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Filtrar por Livro</label>
+                            <select id="rel-livro" onchange="app.gerarRelatorio()" class="w-full px-3 py-2 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Status</label>
+                            <select id="rel-status" onchange="app.gerarRelatorio()" class="w-full px-3 py-2 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">[Todos os Status]</option>
+                                <option value="EMPRESTADO">Apenas Emprestados (Ativos)</option>
+                                <option value="DEVOLVIDO">Apenas Devolvidos</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Período de Empréstimo</label>
+                            <div class="flex items-center gap-1">
+                                <input type="date" id="rel-dt-ini" onchange="app.gerarRelatorio()" class="w-1/2 px-2 py-2 border rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500">
+                                <span class="text-xs text-slate-400">até</span>
+                                <input type="date" id="rel-dt-fim" onchange="app.gerarRelatorio()" class="w-1/2 px-2 py-2 border rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end mt-4">
+                        <button onclick="app.limparFiltrosRelatorio()" class="text-xs text-slate-500 hover:text-blue-600 font-semibold underline">
+                            Limpar Filtros
+                        </button>
+                    </div>
+                </div>
+
+                <!-- KPIs Cards -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm text-center">
+                        <div id="kpi-total" class="text-2xl font-black text-slate-900">0</div>
+                        <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mt-1">Total Listado</div>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm text-center">
+                        <div id="kpi-ativos" class="text-2xl font-black text-amber-600">0</div>
+                        <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mt-1">Empréstimos Ativos</div>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm text-center">
+                        <div id="kpi-devolvidos" class="text-2xl font-black text-emerald-600">0</div>
+                        <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mt-1">Devolvidos</div>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm text-center">
+                        <div id="kpi-atrasados" class="text-2xl font-black text-red-600">0</div>
+                        <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mt-1">Em Atraso</div>
+                    </div>
+                </div>
+
+                <!-- Tabela de Relatório -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-slate-100 text-slate-600 uppercase text-[11px] font-semibold border-b">
+                                <tr>
+                                    <th class="py-3 px-4">ID</th>
+                                    <th class="py-3 px-4">Aluno</th>
+                                    <th class="py-3 px-4">Livro</th>
+                                    <th class="py-3 px-4">Data Empréstimo</th>
+                                    <th class="py-3 px-4">Previsão</th>
+                                    <th class="py-3 px-4">Data Devolução</th>
+                                    <th class="py-3 px-4 text-center">Status / Situação</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-relatorios" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 5: SOBRE O SISTEMA -->
+            <section id="aba-sobre" class="aba-conteudo hidden space-y-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                    <h2 class="text-xl font-bold text-slate-900">Sobre o Sistema de Biblioteca</h2>
+                    <p class="text-slate-600 text-sm leading-relaxed">
+                        Este sistema foi desenvolvido como uma solução completa para controle de acervo bibliotecário e fluxo de empréstimos, originalmente implementado com backend em <strong>Python</strong> e banco de dados relacional <strong>PostgreSQL 18</strong>.
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                        <div class="p-4 rounded-lg bg-blue-50/50 border border-blue-100">
+                            <h3 class="font-bold text-blue-900 text-sm mb-2">⚡ Regras de Negócio e Triggers</h3>
+                            <ul class="text-xs text-slate-700 space-y-2 list-disc list-inside">
+                                <li><strong>Trigger <code>trg_valida_emprestimo</code>:</strong> Bloqueia novos empréstimos caso todas as cópias físicas do livro já estejam emprestadas.</li>
+                                <li><strong>Trigger <code>trg_valida_exclusao_aluno</code>:</strong> Permite a exclusão de aluno apenas se todos os seus empréstimos constarem como devolvidos.</li>
+                                <li><strong>Autenticação Segura:</strong> Criptografia de senhas com Salt aleatório e hash SHA-256.</li>
+                            </ul>
+                        </div>
+
+                        <div class="p-4 rounded-lg bg-emerald-50/50 border border-emerald-100">
+                            <h3 class="font-bold text-emerald-900 text-sm mb-2">📦 Como Rodar no Desktop Localmente</h3>
+                            <p class="text-xs text-slate-700 mb-2">No Visual Studio / VS Code com PostgreSQL rodando:</p>
+                            <pre class="bg-slate-900 text-emerald-400 p-2.5 rounded text-xs overflow-x-auto font-mono">py app_gui.py   # Interface Gráfica
+py main.py      # Console Interativo</pre>
+                        </div>
+                    </div>
+
+                    <div class="pt-4 flex flex-wrap items-center justify-between gap-4 border-t border-slate-100">
+                        <a href="https://github.com/elderdias/biblioteca" target="_blank" class="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-xs font-semibold transition">
+                            <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                            Ver Código no GitHub
+                        </a>
+
+                        <button onclick="app.restaurarDadosPadrao()" class="text-xs text-red-600 hover:underline">
+                            Restaurar Banco de Dados Web para os Dados Padrão
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Modal Cadastro Novo Usuário -->
+    <div id="modal-usuario" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 border">
+            <h3 class="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <span>👤</span> Cadastrar Novo Usuário
+            </h3>
+            <form id="form-cad-usuario" onsubmit="app.salvarUsuario(event)" class="space-y-3 text-sm">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Nome Completo *</label>
+                    <input type="text" id="cad-nome" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Login / Usuário *</label>
+                    <input type="text" id="cad-login" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Cargo</label>
+                    <select id="cad-cargo" class="w-full px-3 py-2 border rounded-lg bg-white outline-none">
+                        <option value="Bibliotecário">Bibliotecário</option>
+                        <option value="Operador">Operador</option>
+                        <option value="Administrador">Administrador</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Senha * (mín 4 caracteres)</label>
+                    <input type="password" id="cad-senha" required minlength="4" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div class="flex justify-end gap-2 pt-3">
+                    <button type="button" onclick="document.getElementById('modal-usuario').classList.add('hidden')" class="px-3 py-1.5 text-xs rounded-lg bg-slate-100 hover:bg-slate-200">Cancelar</button>
+                    <button type="submit" class="px-4 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700">Cadastrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- LOGICA JAVASCRIPT / STORAGE                -->
+    <!-- ========================================== -->
+    <script>
+        const DADOS_INICIAIS = {
+            usuarios: [
+                { id: 1, nome: "Administrador", login: "admin", senha: "admin123", cargo: "Administrador" }
+            ],
+            alunos: [
+                { id_aluno: 1, nome: "Lucas Pereira", matricula: "MAT-202401", email: "lucas@email.com", telefone: "11988881111", data_cadastro: "2026-11-17" },
+                { id_aluno: 2, nome: "Mariana Costa", matricula: "MAT-202402", email: "mariana@email.com", telefone: "11977772222", data_cadastro: "2026-11-17" }
+            ],
+            livros: [
+                { id_livro: 1, titulo: "Redes de Computadores", autor: "Andrew Tanenbaum", isbn: "978-8576059240", quantidade_total: 1 },
+                { id_livro: 2, titulo: "Sistemas de Banco de Dados", autor: "Navathe", isbn: "978-8580553796", quantidade_total: 3 }
+            ],
+            emprestimos: []
+        };
+
+        class BibliotecaApp {
+            constructor() {
+                this.usuarioLogado = null;
+                this.carregarStorage();
+                this.verificarSessao();
+            }
+
+            carregarStorage() {
+                this.usuarios = JSON.parse(localStorage.getItem("bib_usuarios")) || DADOS_INICIAIS.usuarios;
+                this.alunos = JSON.parse(localStorage.getItem("bib_alunos")) || DADOS_INICIAIS.alunos;
+                this.livros = JSON.parse(localStorage.getItem("bib_livros")) || DADOS_INICIAIS.livros;
+                this.emprestimos = JSON.parse(localStorage.getItem("bib_emprestimos")) || DADOS_INICIAIS.emprestimos;
+                this.salvarStorage();
+            }
+
+            salvarStorage() {
+                localStorage.setItem("bib_usuarios", JSON.stringify(this.usuarios));
+                localStorage.setItem("bib_alunos", JSON.stringify(this.alunos));
+                localStorage.setItem("bib_livros", JSON.stringify(this.livros));
+                localStorage.setItem("bib_emprestimos", JSON.stringify(this.emprestimos));
+            }
+
+            restaurarDadosPadrao() {
+                if (confirm("Deseja realmente restaurar os dados padrão? Todos os dados adicionados no navegador serão resetados.")) {
+                    localStorage.clear();
+                    this.carregarStorage();
+                    this.renderizarTudo();
+                    alert("Dados restaurados com sucesso!");
+                }
+            }
+
+            verificarSessao() {
+                const user = sessionStorage.getItem("bib_usuario_logado");
+                if (user) {
+                    this.usuarioLogado = JSON.parse(user);
+                    this.mostrarApp();
+                } else {
+                    this.mostrarLogin();
+                }
+            }
+
+            fazerLogin(e) {
+                e.preventDefault();
+                const login = document.getElementById("login-usuario").value.trim().toLowerCase();
+                const senha = document.getElementById("login-senha").value;
+                const alerta = document.getElementById("login-alerta");
+
+                const usuario = this.usuarios.find(u => u.login.toLowerCase() === login && u.senha === senha);
+                if (usuario) {
+                    alerta.classList.add("hidden");
+                    this.usuarioLogado = usuario;
+                    sessionStorage.setItem("bib_usuario_logado", JSON.stringify(usuario));
+                    this.mostrarApp();
+                } else {
+                    alerta.textContent = "Usuário ou senha incorretos!";
+                    alerta.classList.remove("hidden");
+                }
+            }
+
+            logout() {
+                sessionStorage.removeItem("bib_usuario_logado");
+                this.usuarioLogado = null;
+                this.mostrarLogin();
+            }
+
+            mostrarLogin() {
+                document.getElementById("view-login").classList.remove("hidden");
+                document.getElementById("view-app").classList.add("hidden");
+            }
+
+            mostrarApp() {
+                document.getElementById("view-login").classList.add("hidden");
+                document.getElementById("view-app").classList.remove("hidden");
+                document.getElementById("user-display-name").textContent = this.usuarioLogado.nome;
+                document.getElementById("user-display-role").textContent = this.usuarioLogado.cargo;
+                this.trocarAba("livros");
+                this.renderizarTudo();
+            }
+
+            trocarAba(abaId) {
+                document.querySelectorAll(".aba-conteudo").forEach(el => el.classList.add("hidden"));
+                document.querySelectorAll(".tab-btn").forEach(btn => {
+                    btn.classList.remove("border-blue-400", "text-blue-400", "font-bold");
+                    btn.classList.add("border-transparent", "text-slate-300");
+                });
+
+                const aba = document.getElementById(`aba-${abaId}`);
+                const btn = document.getElementById(`tab-btn-${abaId}`);
+                if (aba) aba.classList.remove("hidden");
+                if (btn) {
+                    btn.classList.add("border-blue-400", "text-blue-400", "font-bold");
+                    btn.classList.remove("border-transparent", "text-slate-300");
+                }
+
+                if (abaId === 'relatorios') this.gerarRelatorio();
+            }
+
+            renderizarTudo() {
+                this.renderizarLivros();
+                this.renderizarAlunos();
+                this.atualizarCombos();
+                this.renderizarEmprestimos();
+                this.gerarRelatorio();
+            }
+
+            // ================== LIVROS ==================
+            getDisponiveisLivro(id_livro) {
+                const livro = this.livros.find(l => l.id_livro === id_livro);
+                if (!livro) return 0;
+                const emprestados = this.emprestimos.filter(e => e.id_livro === id_livro && !e.data_devolucao).length;
+                return Math.max(0, livro.quantidade_total - emprestados);
+            }
+
+            renderizarLivros() {
+                const tbody = document.getElementById("tbody-livros");
+                tbody.innerHTML = "";
+                document.getElementById("contagem-livros").textContent = `${this.livros.length} livro(s)`;
+
+                this.livros.forEach(l => {
+                    const emprestados = this.emprestimos.filter(e => e.id_livro === l.id_livro && !e.data_devolucao).length;
+                    const disponiveis = l.quantidade_total - emprestados;
+
+                    const tr = document.createElement("tr");
+                    tr.className = "hover:bg-slate-50 transition";
+                    tr.innerHTML = `
+                        <td class="py-3 px-4 font-mono text-slate-500">${l.id_livro}</td>
+                        <td class="py-3 px-4 font-semibold text-slate-900">${l.titulo}</td>
+                        <td class="py-3 px-4 text-slate-600">${l.autor}</td>
+                        <td class="py-3 px-4 text-xs font-mono text-slate-500">${l.isbn || '-'}</td>
+                        <td class="py-3 px-4 text-center font-bold">${l.quantidade_total}</td>
+                        <td class="py-3 px-4 text-center text-amber-600 font-semibold">${emprestados}</td>
+                        <td class="py-3 px-4 text-center">
+                            <span class="px-2 py-0.5 rounded-full text-xs font-bold ${disponiveis > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}">
+                                ${disponiveis}
+                            </span>
+                        </td>
+                        <td class="py-3 px-4 text-right space-x-2">
+                            <button onclick="app.editarLivro(${l.id_livro})" class="text-blue-600 hover:text-blue-800 text-xs font-semibold">Editar</button>
+                            <button onclick="app.excluirLivro(${l.id_livro})" class="text-red-600 hover:text-red-800 text-xs font-semibold">Excluir</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            salvarLivro(e) {
+                e.preventDefault();
+                const id = document.getElementById("livro-id").value;
+                const titulo = document.getElementById("livro-titulo").value.trim();
+                const autor = document.getElementById("livro-autor").value.trim();
+                const isbn = document.getElementById("livro-isbn").value.trim();
+                const qtd = parseInt(document.getElementById("livro-qtd").value) || 1;
+
+                if (id) {
+                    const l = this.livros.find(x => x.id_livro === parseInt(id));
+                    if (l) {
+                        l.titulo = titulo;
+                        l.autor = autor;
+                        l.isbn = isbn;
+                        l.quantidade_total = qtd;
+                    }
+                } else {
+                    const novoId = this.livros.length ? Math.max(...this.livros.map(l => l.id_livro)) + 1 : 1;
+                    this.livros.push({ id_livro: novoId, titulo, autor, isbn, quantidade_total: qtd });
+                }
+
+                this.salvarStorage();
+                this.limparFormLivro();
+                this.renderizarTudo();
+            }
+
+            editarLivro(id) {
+                const l = this.livros.find(x => x.id_livro === id);
+                if (!l) return;
+                document.getElementById("livro-id").value = l.id_livro;
+                document.getElementById("livro-titulo").value = l.titulo;
+                document.getElementById("livro-autor").value = l.autor;
+                document.getElementById("livro-isbn").value = l.isbn || '';
+                document.getElementById("livro-qtd").value = l.quantidade_total;
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+
+            excluirLivro(id) {
+                if (confirm(`Deseja realmente excluir o livro ID ${id}?`)) {
+                    this.livros = this.livros.filter(l => l.id_livro !== id);
+                    this.salvarStorage();
+                    this.renderizarTudo();
+                }
+            }
+
+            limparFormLivro() {
+                document.getElementById("form-livro").reset();
+                document.getElementById("livro-id").value = "";
+            }
+
+            // ================== ALUNOS ==================
+            renderizarAlunos() {
+                const tbody = document.getElementById("tbody-alunos");
+                tbody.innerHTML = "";
+                document.getElementById("contagem-alunos").textContent = `${this.alunos.length} aluno(s)`;
+
+                this.alunos.forEach(a => {
+                    const tr = document.createElement("tr");
+                    tr.className = "hover:bg-slate-50 transition";
+                    tr.innerHTML = `
+                        <td class="py-3 px-4 font-mono text-slate-500">${a.id_aluno}</td>
+                        <td class="py-3 px-4 font-semibold text-slate-900">${a.nome}</td>
+                        <td class="py-3 px-4 text-xs font-mono font-bold text-slate-700">${a.matricula}</td>
+                        <td class="py-3 px-4 text-slate-600">${a.email || '-'}</td>
+                        <td class="py-3 px-4 text-slate-600">${a.telefone || '-'}</td>
+                        <td class="py-3 px-4 text-right space-x-2">
+                            <button onclick="app.editarAluno(${a.id_aluno})" class="text-blue-600 hover:text-blue-800 text-xs font-semibold">Editar</button>
+                            <button onclick="app.excluirAluno(${a.id_aluno})" class="text-red-600 hover:text-red-800 text-xs font-semibold">Excluir</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            salvarAluno(e) {
+                e.preventDefault();
+                const id = document.getElementById("aluno-id").value;
+                const nome = document.getElementById("aluno-nome").value.trim();
+                const matricula = document.getElementById("aluno-matricula").value.trim();
+                const email = document.getElementById("aluno-email").value.trim();
+                const telefone = document.getElementById("aluno-telefone").value.trim();
+
+                if (id) {
+                    const a = this.alunos.find(x => x.id_aluno === parseInt(id));
+                    if (a) {
+                        a.nome = nome;
+                        a.matricula = matricula;
+                        a.email = email;
+                        a.telefone = telefone;
+                    }
+                } else {
+                    const novoId = this.alunos.length ? Math.max(...this.alunos.map(a => a.id_aluno)) + 1 : 1;
+                    this.alunos.push({ id_aluno: novoId, nome, matricula, email, telefone, data_cadastro: new Date().toISOString().split("T")[0] });
+                }
+
+                this.salvarStorage();
+                this.limparFormAluno();
+                this.renderizarTudo();
+            }
+
+            editarAluno(id) {
+                const a = this.alunos.find(x => x.id_aluno === id);
+                if (!a) return;
+                document.getElementById("aluno-id").value = a.id_aluno;
+                document.getElementById("aluno-nome").value = a.nome;
+                document.getElementById("aluno-matricula").value = a.matricula;
+                document.getElementById("aluno-email").value = a.email || '';
+                document.getElementById("aluno-telefone").value = a.telefone || '';
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+
+            excluirAluno(id) {
+                // REGRA DO BANCO DE DADOS: Bloqueia se houver empréstimo ativo!
+                const pendentes = this.emprestimos.filter(e => e.id_aluno === id && !e.data_devolucao);
+                if (pendentes.length > 0) {
+                    alert(`Não é possível excluir o aluno: existem ${pendentes.length} empréstimo(s) pendente(s) de devolução!`);
+                    return;
+                }
+
+                if (confirm(`Confirmar exclusão do aluno ID ${id}? O histórico de devoluções passadas será liberado.`)) {
+                    this.emprestimos = this.emprestimos.filter(e => e.id_aluno !== id);
+                    this.alunos = this.alunos.filter(a => a.id_aluno !== id);
+                    this.salvarStorage();
+                    this.renderizarTudo();
+                    alert("Aluno excluído com sucesso!");
+                }
+            }
+
+            limparFormAluno() {
+                document.getElementById("form-aluno").reset();
+                document.getElementById("aluno-id").value = "";
+            }
+
+            // ================== EMPRÉSTIMOS ==================
+            atualizarCombos() {
+                const selAlunoEmp = document.getElementById("emp-aluno");
+                const selLivroEmp = document.getElementById("emp-livro");
+                const selAlunoRel = document.getElementById("rel-aluno");
+                const selLivroRel = document.getElementById("rel-livro");
+
+                selAlunoEmp.innerHTML = `<option value="">Selecione o Aluno...</option>` +
+                    this.alunos.map(a => `<option value="${a.id_aluno}">${a.nome} (${a.matricula})</option>`).join("");
+
+                selLivroEmp.innerHTML = `<option value="">Selecione o Livro...</option>` +
+                    this.livros.map(l => {
+                        const disp = this.getDisponiveisLivro(l.id_livro);
+                        return `<option value="${l.id_livro}">${l.titulo} [Disp: ${disp}/${l.quantidade_total}]</option>`;
+                    }).join("");
+
+                selAlunoRel.innerHTML = `<option value="">[Todos os Alunos]</option>` +
+                    this.alunos.map(a => `<option value="${a.id_aluno}">${a.nome} (${a.matricula})</option>`).join("");
+
+                selLivroRel.innerHTML = `<option value="">[Todos os Livros]</option>` +
+                    this.livros.map(l => `<option value="${l.id_livro}">${l.titulo}</option>`).join("");
+            }
+
+            realizarEmprestimo(e) {
+                e.preventDefault();
+                const id_aluno = parseInt(document.getElementById("emp-aluno").value);
+                const id_livro = parseInt(document.getElementById("emp-livro").value);
+                const dias = parseInt(document.getElementById("emp-dias").value) || 7;
+
+                if (!id_aluno || !id_livro) {
+                    alert("Selecione o aluno e o livro.");
+                    return;
+                }
+
+                // SIMULAÇÃO DA TRIGGER DO POSTGRESQL (trg_valida_emprestimo)
+                const disp = this.getDisponiveisLivro(id_livro);
+                const livro = this.livros.find(l => l.id_livro === id_livro);
+                if (disp <= 0) {
+                    alert(`Empréstimo negado pelo banco: Este livro possui apenas ${livro.quantidade_total} unidade(s) e já está emprestado! Aguarde a devolução.`);
+                    return;
+                }
+
+                const hoje = new Date();
+                const prev = new Date();
+                prev.setDate(hoje.getDate() + dias);
+
+                const novoId = this.emprestimos.length ? Math.max(...this.emprestimos.map(x => x.id_emprestimo)) + 1 : 1;
+                this.emprestimos.push({
+                    id_emprestimo: novoId,
+                    id_aluno,
+                    id_livro,
+                    data_emprestimo: hoje.toISOString(),
+                    data_previsao_devolucao: prev.toISOString().split("T")[0],
+                    data_devolucao: null,
+                    status: "EMPRESTADO"
+                });
+
+                this.salvarStorage();
+                document.getElementById("form-emprestimo").reset();
+                document.getElementById("emp-dias").value = "7";
+                this.renderizarTudo();
+                alert(`Empréstimo nº ${novoId} registrado com sucesso!`);
+            }
+
+            registrarDevolucao(id_emprestimo) {
+                const emp = this.emprestimos.find(e => e.id_emprestimo === id_emprestimo);
+                if (!emp || emp.data_devolucao) return;
+
+                if (confirm(`Confirmar devolução do empréstimo nº ${id_emprestimo}?`)) {
+                    emp.data_devolucao = new Date().toISOString();
+                    emp.status = "DEVOLVIDO";
+                    this.salvarStorage();
+                    this.renderizarTudo();
+                }
+            }
+
+            renderizarEmprestimos() {
+                const tbody = document.getElementById("tbody-emprestimos");
+                tbody.innerHTML = "";
+                const apenasAtivos = document.getElementById("filtro-emp-ativos").checked;
+
+                const lista = apenasAtivos ? this.emprestimos.filter(e => !e.data_devolucao) : this.emprestimos;
+                document.getElementById("contagem-emprestimos").textContent = `${lista.length} empréstimo(s)`;
+
+                lista.slice().reverse().forEach(e => {
+                    const aluno = this.alunos.find(a => a.id_aluno === e.id_aluno) || { nome: "Desconhecido" };
+                    const livro = this.livros.find(l => l.id_livro === e.id_livro) || { titulo: "Desconhecido" };
+                    const dtEmp = new Date(e.data_emprestimo).toLocaleDateString("pt-BR");
+                    const dtPrev = new Date(e.data_previsao_devolucao + "T00:00:00").toLocaleDateString("pt-BR");
+                    const dtDev = e.data_devolucao ? new Date(e.data_devolucao).toLocaleDateString("pt-BR") : "-";
+
+                    const tr = document.createElement("tr");
+                    tr.className = "hover:bg-slate-50 transition";
+                    tr.innerHTML = `
+                        <td class="py-3 px-4 font-mono text-slate-500">${e.id_emprestimo}</td>
+                        <td class="py-3 px-4 font-semibold text-slate-900">${aluno.nome}</td>
+                        <td class="py-3 px-4 text-slate-700">${livro.titulo}</td>
+                        <td class="py-3 px-4 text-xs text-slate-500">${dtEmp}</td>
+                        <td class="py-3 px-4 text-xs font-semibold text-slate-700">${dtPrev}</td>
+                        <td class="py-3 px-4 text-xs text-slate-500">${dtDev}</td>
+                        <td class="py-3 px-4 text-center">
+                            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold ${e.status === 'EMPRESTADO' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}">
+                                ${e.status}
+                            </span>
+                        </td>
+                        <td class="py-3 px-4 text-right">
+                            ${!e.data_devolucao ? `<button onclick="app.registrarDevolucao(${e.id_emprestimo})" class="px-2.5 py-1 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded shadow-sm">Devolver</button>` : `<span class="text-xs text-slate-400">Finalizado</span>`}
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            // ================== RELATÓRIOS ==================
+            gerarRelatorio() {
+                const idAluno = document.getElementById("rel-aluno").value ? parseInt(document.getElementById("rel-aluno").value) : null;
+                const idLivro = document.getElementById("rel-livro").value ? parseInt(document.getElementById("rel-livro").value) : null;
+                const status = document.getElementById("rel-status").value;
+                const dtIni = document.getElementById("rel-dt-ini").value;
+                const dtFim = document.getElementById("rel-dt-fim").value;
+
+                let filtrados = this.emprestimos.filter(e => {
+                    if (idAluno && e.id_aluno !== idAluno) return false;
+                    if (idLivro && e.id_livro !== idLivro) return false;
+                    if (status && e.status !== status) return false;
+                    const empDataIso = e.data_emprestimo.split("T")[0];
+                    if (dtIni && empDataIso < dtIni) return false;
+                    if (dtFim && empDataIso > dtFim) return false;
+                    return true;
+                });
+
+                this.dadosRelatorioAtual = filtrados;
+
+                const hoje = new Date().toISOString().split("T")[0];
+                let ativos = 0, devolvidos = 0, atrasados = 0;
+
+                const tbody = document.getElementById("tbody-relatorios");
+                tbody.innerHTML = "";
+
+                if (filtrados.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-slate-400">Nenhum empréstimo encontrado para os filtros selecionados.</td></tr>`;
+                }
+
+                filtrados.slice().reverse().forEach(e => {
+                    const aluno = this.alunos.find(a => a.id_aluno === e.id_aluno) || { nome: "Desconhecido", matricula: "-" };
+                    const livro = this.livros.find(l => l.id_livro === e.id_livro) || { titulo: "Desconhecido" };
+                    const dtEmp = new Date(e.data_emprestimo).toLocaleDateString("pt-BR");
+                    const dtPrev = new Date(e.data_previsao_devolucao + "T00:00:00").toLocaleDateString("pt-BR");
+                    const dtDev = e.data_devolucao ? new Date(e.data_devolucao).toLocaleDateString("pt-BR") : "-";
+
+                    const isAtrasado = (!e.data_devolucao && e.data_previsao_devolucao < hoje);
+                    if (e.status === 'EMPRESTADO') ativos++;
+                    if (e.status === 'DEVOLVIDO') devolvidos++;
+                    if (isAtrasado) atrasados++;
+
+                    let badgeHtml = '';
+                    if (isAtrasado) {
+                        badgeHtml = `<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800">⚠️ Atrasado</span>`;
+                    } else if (e.status === 'EMPRESTADO') {
+                        badgeHtml = `<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">Emprestado</span>`;
+                    } else {
+                        badgeHtml = `<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">Devolvido</span>`;
+                    }
+
+                    const tr = document.createElement("tr");
+                    tr.className = "hover:bg-slate-50 transition";
+                    tr.innerHTML = `
+                        <td class="py-3 px-4 font-mono text-slate-500">${e.id_emprestimo}</td>
+                        <td class="py-3 px-4">
+                            <span class="font-semibold text-slate-900 block">${aluno.nome}</span>
+                            <span class="text-xs text-slate-400">Matrícula: ${aluno.matricula}</span>
+                        </td>
+                        <td class="py-3 px-4 font-medium text-slate-800">${livro.titulo}</td>
+                        <td class="py-3 px-4 text-xs text-slate-600">${dtEmp}</td>
+                        <td class="py-3 px-4 text-xs font-semibold text-slate-700">${dtPrev}</td>
+                        <td class="py-3 px-4 text-xs text-slate-600">${dtDev}</td>
+                        <td class="py-3 px-4 text-center">${badgeHtml}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                document.getElementById("kpi-total").textContent = filtrados.length;
+                document.getElementById("kpi-ativos").textContent = ativos;
+                document.getElementById("kpi-devolvidos").textContent = devolvidos;
+                document.getElementById("kpi-atrasados").textContent = atrasados;
+            }
+
+            limparFiltrosRelatorio() {
+                document.getElementById("rel-aluno").value = "";
+                document.getElementById("rel-livro").value = "";
+                document.getElementById("rel-status").value = "";
+                document.getElementById("rel-dt-ini").value = "";
+                document.getElementById("rel-dt-fim").value = "";
+                this.gerarRelatorio();
+            }
+
+            exportarRelatorioCSV() {
+                if (!this.dadosRelatorioAtual || this.dadosRelatorioAtual.length === 0) {
+                    alert("Não há dados para exportar no relatório!");
+                    return;
+                }
+
+                let csv = "\uFEFFID;Aluno;Matrícula;Livro;Data Empréstimo;Previsão Devolução;Data Devolução;Status\n";
+                this.dadosRelatorioAtual.forEach(e => {
+                    const aluno = this.alunos.find(a => a.id_aluno === e.id_aluno) || { nome: "", matricula: "" };
+                    const livro = this.livros.find(l => l.id_livro === e.id_livro) || { titulo: "" };
+                    csv += `${e.id_emprestimo};"${aluno.nome}";"${aluno.matricula}";"${livro.titulo}";${e.data_emprestimo.split("T")[0]};${e.data_previsao_devolucao};${e.data_devolucao ? e.data_devolucao.split("T")[0] : ''};${e.status}\n`;
+                });
+
+                const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = `relatorio_emprestimos_${new Date().toISOString().slice(0, 10)}.csv`;
+                link.click();
+            }
+
+            // ================== USUÁRIOS ==================
+            abrirModalCadastroUsuario() {
+                document.getElementById("modal-usuario").classList.remove("hidden");
+            }
+
+            salvarUsuario(e) {
+                e.preventDefault();
+                const nome = document.getElementById("cad-nome").value.trim();
+                const login = document.getElementById("cad-login").value.trim().toLowerCase();
+                const cargo = document.getElementById("cad-cargo").value;
+                const senha = document.getElementById("cad-senha").value;
+
+                if (this.usuarios.some(u => u.login.toLowerCase() === login)) {
+                    alert("Este login de usuário já está em uso!");
+                    return;
+                }
+
+                const novoId = this.usuarios.length ? Math.max(...this.usuarios.map(u => u.id)) + 1 : 1;
+                this.usuarios.push({ id: novoId, nome, login, cargo, senha });
+                this.salvarStorage();
+
+                alert(`Usuário '${login}' cadastrado com sucesso!`);
+                document.getElementById("modal-usuario").classList.add("hidden");
+                document.getElementById("form-cad-usuario").reset();
+            }
+        }
+
+        const app = new BibliotecaApp();
+    </script>
+</body>
+</html>
