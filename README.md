@@ -42,8 +42,9 @@ Redes/
 │   ├── auth_service.py          # Autenticação, hash SHA-256 e gestão de usuários
 │   ├── aluno_service.py         # CRUD e buscas de Alunos
 │   ├── livro_service.py         # CRUD, buscas e cálculo de estoque de Livros
-│   └── emprestimo_service.py    # Empréstimos, devoluções e regras de negócio
-├── app_gui.py                   # Interface Gráfica Desktop (Tela de Login + Sistema)
+│   ├── emprestimo_service.py    # Empréstimos, devoluções e regras de negócio
+│   └── relatorio_service.py     # Relatórios, filtros dinâmicos e exportações (CSV/HTML)
+├── app_gui.py                   # Interface Gráfica Desktop (Login + Abas + Relatórios)
 ├── main.py                      # Menu interativo no Terminal e inicializador
 ├── database.py                  # Gerenciador de conexão com PostgreSQL (psycopg)
 ├── config.py                    # Variáveis de conexão com o banco
@@ -51,6 +52,20 @@ Redes/
 ├── .gitignore                   # Arquivos ignorados pelo Git
 └── README.md                    # Documentação do projeto
 ```
+
+---
+
+## 📊 Relatórios e Filtros de Empréstimos
+
+O sistema conta com uma aba exclusiva **"📊 Relatórios"** (e opção 4 no menu de terminal), que permite:
+
+- **Filtrar por Aluno:** Visualize os empréstimos de um aluno específico ou de todos.
+- **Filtrar por Livro:** Acompanhe a circulação de um livro específico ou de todo o acervo.
+- **Filtrar por Período de Datas:** Pesquise por intervalo de datas de empréstimo (`DD/MM/AAAA`).
+- **Filtrar por Status:** Visualize apenas empréstimos ativos (`EMPRESTADO`), devoluções (`DEVOLVIDO`) ou todos.
+- **Detecção de Atrasos:** Identifica empréstimos ativos que ultrapassaram a data de previsão e exibe a quantidade exata de dias em atraso com destaque visual.
+- **Exportação para CSV (Excel):** Exporta os dados filtrados com codificação UTF-8 compatível com Microsoft Excel.
+- **Exportação para HTML:** Abre no navegador um relatório visual com cards de indicadores (KPIs) pronto para impressão ou salvamento em PDF.
 
 ---
 

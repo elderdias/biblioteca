@@ -1,11 +1,14 @@
+import os
+import webbrowser
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 from datetime import datetime
 
 import services.aluno_service as aluno_service
 import services.livro_service as livro_service
 import services.emprestimo_service as emprestimo_service
 import services.auth_service as auth_service
+import services.relatorio_service as relatorio_service
 from database import test_connection
 from config import DB_HOST, DB_PORT, DB_NAME, DB_USER
 
@@ -372,16 +375,19 @@ class BibliotecaApp(tk.Tk):
         self.tab_livros = ttk.Frame(self.notebook, padding=10)
         self.tab_alunos = ttk.Frame(self.notebook, padding=10)
         self.tab_emprestimos = ttk.Frame(self.notebook, padding=10)
+        self.tab_relatorios = ttk.Frame(self.notebook, padding=10)
         self.tab_info = ttk.Frame(self.notebook, padding=15)
 
         self.notebook.add(self.tab_livros, text=" 📖 Livros ")
         self.notebook.add(self.tab_alunos, text=" 🎓 Alunos ")
         self.notebook.add(self.tab_emprestimos, text=" 🔄 Empréstimos ")
+        self.notebook.add(self.tab_relatorios, text=" 📊 Relatórios ")
         self.notebook.add(self.tab_info, text=" ⚙️ Usuários & Banco ")
 
         self._montar_aba_livros()
         self._montar_aba_alunos()
         self._montar_aba_emprestimos()
+        self._montar_aba_relatorios()
         self._montar_aba_info()
 
     # =========================================================================
@@ -769,6 +775,10 @@ class BibliotecaApp(tk.Tk):
             self.combo_emprestimo_livro["values"] = list(self._map_livros.keys())
             if self._map_livros:
                 self.combo_emprestimo_livro.current(0)
+
+            if hasattr(self, "combo_rel_aluno"):
+                self._atualizar_combos_relatorio()
+                self._gerar_relatorio()
         except Exception as e:
             print("Erro ao atualizar combos:", e)
 
@@ -850,6 +860,300 @@ class BibliotecaApp(tk.Tk):
             print("Erro ao carregar empréstimos:", e)
 
     # =========================================================================
+    # ABA RELATÓRIOS DE EMPRÉSTIMOS COM FILTROS
+    # =========================================================================
+    def _montar_aba_relatorios(self):
+        self._dados_relatorio_atual = []
+
+        # Card de Filtros
+        form = ttk.LabelFrame(self.tab_relatorios, text="Filtros do Relatório de Empréstimos", padding=10)
+        form.pack(fill="x", side="top", pady=5)
+
+        # Linha 1 de Filtros
+        ttk.Label(form, text="Filtrar por Aluno:").grid(row=0, column=0, sticky="w", padx=5, pady=4)
+        self.combo_rel_aluno = ttk.Combobox(form, state="readonly", width=32)
+        self.combo_rel_aluno.grid(row=0, column=1, sticky="w", padx=5, pady=4)
+
+        ttk.Label(form, text="Filtrar por Livro:").grid(row=0, column=2, sticky="w", padx=5, pady=4)
+        self.combo_rel_livro = ttk.Combobox(form, state="readonly", width=35)
+        self.combo_rel_livro.grid(row=0, column=3, sticky="w", padx=5, pady=4)
+
+        ttk.Label(form, text="Status:").grid(row=0, column=4, sticky="w", padx=5, pady=4)
+        self.combo_rel_status = ttk.Combobox(
+            form, 
+            state="readonly", 
+            width=16, 
+            values=["[Todos os Status]", "EMPRESTADO", "DEVOLVIDO"]
+        )
+        self.combo_rel_status.set("[Todos os Status]")
+        self.combo_rel_status.grid(row=0, column=5, sticky="w", padx=5, pady=4)
+
+        # Linha 2 de Filtros (Datas e Ações de busca)
+        ttk.Label(form, text="Data Inicial:").grid(row=1, column=0, sticky="w", padx=5, pady=6)
+        frame_dt_ini = ttk.Frame(form)
+        frame_dt_ini.grid(row=1, column=1, sticky="w", padx=5, pady=6)
+        self.txt_rel_data_ini = ttk.Entry(frame_dt_ini, width=12)
+        self.txt_rel_data_ini.pack(side="left")
+        ttk.Label(frame_dt_ini, text=" (DD/MM/AAAA)", font=("Segoe UI", 8), foreground="#64748b").pack(side="left", padx=2)
+
+        ttk.Label(form, text="Data Final:").grid(row=1, column=2, sticky="w", padx=5, pady=6)
+        frame_dt_fim = ttk.Frame(form)
+        frame_dt_fim.grid(row=1, column=3, sticky="w", padx=5, pady=6)
+        self.txt_rel_data_fim = ttk.Entry(frame_dt_fim, width=12)
+        self.txt_rel_data_fim.pack(side="left")
+        ttk.Label(frame_dt_fim, text=" (DD/MM/AAAA)", font=("Segoe UI", 8), foreground="#64748b").pack(side="left", padx=2)
+
+        # Botões de busca
+        botoes_busca = ttk.Frame(form)
+        botoes_busca.grid(row=1, column=4, columnspan=2, sticky="e", padx=5, pady=6)
+
+        ttk.Button(
+            botoes_busca, 
+            text="🔍 Filtrar Relatório", 
+            style="Primary.TButton", 
+            command=self._gerar_relatorio
+        ).pack(side="left", padx=4)
+
+        ttk.Button(
+            botoes_busca, 
+            text="Limpar Filtros", 
+            command=self._limpar_filtros_relatorio
+        ).pack(side="left", padx=4)
+
+        # Barra de Ações (Exportações e Resumo)
+        barra_export = ttk.Frame(self.tab_relatorios)
+        barra_export.pack(fill="x", pady=6)
+
+        self.lbl_rel_resumo = tk.Label(
+            barra_export,
+            text="Carregando dados...",
+            font=("Segoe UI", 9, "bold"),
+            fg="#1e293b"
+        )
+        self.lbl_rel_resumo.pack(side="left", padx=5)
+
+        btn_html = tk.Button(
+            barra_export,
+            text="🌐 Visualizar Relatório em HTML",
+            font=("Segoe UI", 9, "bold"),
+            bg="#0284c7",
+            fg="#ffffff",
+            activebackground="#0369a1",
+            activeforeground="#ffffff",
+            relief="flat",
+            cursor="hand2",
+            padx=10,
+            pady=4,
+            command=self._exportar_relatorio_html
+        )
+        btn_html.pack(side="right", padx=4)
+
+        btn_csv = tk.Button(
+            barra_export,
+            text="📥 Exportar para CSV (Excel)",
+            font=("Segoe UI", 9, "bold"),
+            bg="#16a34a",
+            fg="#ffffff",
+            activebackground="#15803d",
+            activeforeground="#ffffff",
+            relief="flat",
+            cursor="hand2",
+            padx=10,
+            pady=4,
+            command=self._exportar_relatorio_csv
+        )
+        btn_csv.pack(side="right", padx=4)
+
+        # Tabela do Relatório
+        tabela_frame = ttk.Frame(self.tab_relatorios)
+        tabela_frame.pack(fill="both", expand=True, pady=5)
+
+        colunas = ("id", "aluno", "matricula", "livro", "dt_emp", "dt_prev", "dt_dev", "status", "situacao")
+        self.grid_relatorios = ttk.Treeview(tabela_frame, columns=colunas, show="headings", selectmode="browse")
+
+        self.grid_relatorios.heading("id", text="ID")
+        self.grid_relatorios.heading("aluno", text="Aluno")
+        self.grid_relatorios.heading("matricula", text="Matrícula")
+        self.grid_relatorios.heading("livro", text="Livro")
+        self.grid_relatorios.heading("dt_emp", text="Empréstimo")
+        self.grid_relatorios.heading("dt_prev", text="Prev. Devolução")
+        self.grid_relatorios.heading("dt_dev", text="Data Devolução")
+        self.grid_relatorios.heading("status", text="Status")
+        self.grid_relatorios.heading("situacao", text="Situação / Atraso")
+
+        self.grid_relatorios.column("id", width=45, anchor="center")
+        self.grid_relatorios.column("aluno", width=160)
+        self.grid_relatorios.column("matricula", width=95, anchor="center")
+        self.grid_relatorios.column("livro", width=210)
+        self.grid_relatorios.column("dt_emp", width=110, anchor="center")
+        self.grid_relatorios.column("dt_prev", width=105, anchor="center")
+        self.grid_relatorios.column("dt_dev", width=110, anchor="center")
+        self.grid_relatorios.column("status", width=90, anchor="center")
+        self.grid_relatorios.column("situacao", width=130, anchor="center")
+
+        # Tags visuais de destaque
+        self.grid_relatorios.tag_configure("atrasado", foreground="#b91c1c")
+        self.grid_relatorios.tag_configure("emprestado", foreground="#d97706")
+        self.grid_relatorios.tag_configure("devolvido", foreground="#15803d")
+
+        scroll_y = ttk.Scrollbar(tabela_frame, orient="vertical", command=self.grid_relatorios.yview)
+        self.grid_relatorios.configure(yscrollcommand=scroll_y.set)
+        self.grid_relatorios.pack(side="left", fill="both", expand=True)
+        scroll_y.pack(side="right", fill="y")
+
+    def _atualizar_combos_relatorio(self):
+        try:
+            alunos = aluno_service.listar_alunos()
+            self._map_rel_alunos = {"[Todos os Alunos]": None}
+            for a in alunos:
+                self._map_rel_alunos[f"{a['nome']} ({a['matricula']})"] = a["id_aluno"]
+            self.combo_rel_aluno["values"] = list(self._map_rel_alunos.keys())
+            if not self.combo_rel_aluno.get() or self.combo_rel_aluno.get() not in self._map_rel_alunos:
+                self.combo_rel_aluno.current(0)
+
+            livros = livro_service.listar_livros()
+            self._map_rel_livros = {"[Todos os Livros]": None}
+            for l in livros:
+                self._map_rel_livros[l["titulo"]] = l["id_livro"]
+            self.combo_rel_livro["values"] = list(self._map_rel_livros.keys())
+            if not self.combo_rel_livro.get() or self.combo_rel_livro.get() not in self._map_rel_livros:
+                self.combo_rel_livro.current(0)
+        except Exception as e:
+            print("Erro ao atualizar combos de relatório:", e)
+
+    def _gerar_relatorio(self):
+        for row in self.grid_relatorios.get_children():
+            self.grid_relatorios.delete(row)
+
+        aluno_sel = self.combo_rel_aluno.get()
+        livro_sel = self.combo_rel_livro.get()
+        status_sel = self.combo_rel_status.get()
+        data_ini_str = self.txt_rel_data_ini.get().strip()
+        data_fim_str = self.txt_rel_data_fim.get().strip()
+
+        id_aluno = getattr(self, "_map_rel_alunos", {}).get(aluno_sel)
+        id_livro = getattr(self, "_map_rel_livros", {}).get(livro_sel)
+
+        status_param = None
+        if status_sel in ("EMPRESTADO", "DEVOLVIDO"):
+            status_param = status_sel
+
+        try:
+            dados = relatorio_service.gerar_relatorio_emprestimos(
+                id_aluno=id_aluno,
+                id_livro=id_livro,
+                data_inicio=data_ini_str if data_ini_str else None,
+                data_fim=data_fim_str if data_fim_str else None,
+                status=status_param
+            )
+            self._dados_relatorio_atual = dados
+
+            total = len(dados)
+            ativos = sum(1 for r in dados if r["status"] == "EMPRESTADO")
+            devolvidos = sum(1 for r in dados if r["status"] == "DEVOLVIDO")
+            atrasados = sum(1 for r in dados if r.get("atrasado"))
+
+            self.lbl_rel_resumo.config(
+                text=f"Total: {total} | Emprestados: {ativos} | Devolvidos: {devolvidos} | Em Atraso: {atrasados}"
+            )
+
+            for r in dados:
+                dt_emp = r["data_emprestimo"].strftime("%d/%m/%Y %H:%M") if r.get("data_emprestimo") else "-"
+                dt_prev = r["data_previsao_devolucao"].strftime("%d/%m/%Y") if r.get("data_previsao_devolucao") else "-"
+                dt_dev = r["data_devolucao"].strftime("%d/%m/%Y %H:%M") if r.get("data_devolucao") else "-"
+
+                if r.get("atrasado"):
+                    tag = "atrasado"
+                    situacao = f"⚠️ ATRASADO ({r['dias_atraso']}d)"
+                elif r["status"] == "EMPRESTADO":
+                    tag = "emprestado"
+                    situacao = "No prazo"
+                else:
+                    tag = "devolvido"
+                    situacao = "Devolvido"
+
+                self.grid_relatorios.insert("", "end", values=(
+                    r["id_emprestimo"],
+                    r["nome_aluno"],
+                    r["matricula_aluno"],
+                    r["titulo_livro"],
+                    dt_emp,
+                    dt_prev,
+                    dt_dev,
+                    r["status"],
+                    situacao
+                ), tags=(tag,))
+
+        except ValueError as ve:
+            messagebox.showwarning("Filtro Inválido", str(ve))
+        except Exception as e:
+            messagebox.showerror("Erro ao Gerar Relatório", str(e))
+
+    def _limpar_filtros_relatorio(self):
+        if hasattr(self, "combo_rel_aluno"):
+            self.combo_rel_aluno.current(0)
+        if hasattr(self, "combo_rel_livro"):
+            self.combo_rel_livro.current(0)
+        if hasattr(self, "combo_rel_status"):
+            self.combo_rel_status.set("[Todos os Status]")
+        self.txt_rel_data_ini.delete(0, tk.END)
+        self.txt_rel_data_fim.delete(0, tk.END)
+        self._gerar_relatorio()
+
+    def _obter_descricao_filtros(self):
+        partes = []
+        aluno_sel = self.combo_rel_aluno.get()
+        if aluno_sel and aluno_sel != "[Todos os Alunos]":
+            partes.append(f"Aluno: {aluno_sel}")
+        livro_sel = self.combo_rel_livro.get()
+        if livro_sel and livro_sel != "[Todos os Livros]":
+            partes.append(f"Livro: {livro_sel}")
+        status_sel = self.combo_rel_status.get()
+        if status_sel and status_sel != "[Todos os Status]":
+            partes.append(f"Status: {status_sel}")
+        d_ini = self.txt_rel_data_ini.get().strip()
+        d_fim = self.txt_rel_data_fim.get().strip()
+        if d_ini or d_fim:
+            partes.append(f"Período: {d_ini or 'início'} até {d_fim or 'atual'}")
+        return " | ".join(partes) if partes else "Todos os registros (Sem filtros)"
+
+    def _exportar_relatorio_csv(self):
+        if not getattr(self, "_dados_relatorio_atual", None):
+            messagebox.showwarning("Aviso", "Não há dados no relatório atual para exportar!")
+            return
+
+        caminho = filedialog.asksaveasfilename(
+            parent=self,
+            title="Salvar Relatório em CSV",
+            defaultextension=".csv",
+            filetypes=[("Arquivo CSV (Excel)", "*.csv"), ("Todos os arquivos", "*.*")],
+            initialfile=f"relatorio_emprestimos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        )
+        if not caminho:
+            return
+
+        try:
+            relatorio_service.exportar_relatorio_csv(self._dados_relatorio_atual, caminho)
+            messagebox.showinfo("Sucesso", f"Relatório exportado com sucesso para:\n{caminho}")
+        except Exception as e:
+            messagebox.showerror("Erro ao Exportar", str(e))
+
+    def _exportar_relatorio_html(self):
+        if not getattr(self, "_dados_relatorio_atual", None):
+            messagebox.showwarning("Aviso", "Não há dados no relatório atual para exportar!")
+            return
+
+        pasta_temp = os.getenv("TEMP", ".")
+        caminho_html = os.path.join(pasta_temp, f"relatorio_emprestimos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html")
+
+        try:
+            desc_filtros = self._obter_descricao_filtros()
+            relatorio_service.exportar_relatorio_html(self._dados_relatorio_atual, caminho_html, desc_filtros)
+            webbrowser.open(f"file:///{os.path.abspath(caminho_html).replace(os.sep, '/')}")
+        except Exception as e:
+            messagebox.showerror("Erro ao abrir relatório", str(e))
+
+    # =========================================================================
     # ABA INFORMAÇÕES, USUÁRIOS & BANCO DE DADOS
     # =========================================================================
     def _montar_aba_info(self):
@@ -908,6 +1212,8 @@ class BibliotecaApp(tk.Tk):
             self._carregar_alunos()
             self._carregar_emprestimos()
             self._atualizar_combos_emprestimo()
+            self._atualizar_combos_relatorio()
+            self._gerar_relatorio()
         else:
             self.lbl_status_db.config(text="● Falha na Conexão", fg="#ef4444")
             messagebox.showwarning("Aviso de Conexão", f"Não foi possível conectar ao PostgreSQL:\n{msg}")

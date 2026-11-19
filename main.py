@@ -1,9 +1,11 @@
 import sys
+import webbrowser
 from database import test_connection, init_db
 import services.aluno_service as aluno_service
 import services.livro_service as livro_service
 import services.emprestimo_service as emprestimo_service
 import services.auth_service as auth_service
+import services.relatorio_service as relatorio_service
 
 def imprimir_cabecalho(texto: str):
     print("\n" + "=" * 60)
@@ -249,6 +251,121 @@ def menu_emprestimos():
             break
 
 
+def menu_relatorios():
+    filtro_aluno = None
+    filtro_livro = None
+    filtro_data_ini = None
+    filtro_data_fim = None
+    filtro_status = None
+
+    while True:
+        imprimir_cabecalho("RELATÓRIOS DE EMPRÉSTIMOS")
+        print("Filtros Ativos Atualmente:")
+        print(f"  • Aluno ID: {filtro_aluno if filtro_aluno else '[Todos os Alunos]'}")
+        print(f"  • Livro ID: {filtro_livro if filtro_livro else '[Todos os Livros]'}")
+        print(f"  • Período: {filtro_data_ini or 'Qualquer data'} até {filtro_data_fim or 'atual'}")
+        print(f"  • Status: {filtro_status if filtro_status else '[Todos]'}")
+
+        print("\nOpções:")
+        print("1. 👁️  Visualizar Relatório com os Filtros Atuais")
+        print("2. 🎓 Filtrar por Aluno (ID)")
+        print("3. 📖 Filtrar por Livro (ID)")
+        print("4. 📅 Filtrar por Período de Datas")
+        print("5. 📌 Filtrar por Status (Emprestado / Devolvido)")
+        print("6. 🧹 Limpar Todos os Filtros")
+        print("7. 📥 Exportar para Arquivo CSV (Excel)")
+        print("8. 🌐 Exportar e Abrir Relatório em HTML")
+        print("0. Voltar ao Menu Principal")
+
+        op = input("\nEscolha uma opção: ").strip()
+
+        if op == "1":
+            try:
+                registros = relatorio_service.gerar_relatorio_emprestimos(
+                    id_aluno=filtro_aluno,
+                    id_livro=filtro_livro,
+                    data_inicio=filtro_data_ini,
+                    data_fim=filtro_data_fim,
+                    status=filtro_status
+                )
+                print("\n" + "=" * 105)
+                print(f"{'ID':<4} | {'Aluno':<22} | {'Livro':<28} | {'Empréstimo':<12} | {'Prev. Dev.':<10} | {'Status':<11} | {'Situação'}")
+                print("=" * 105)
+                for r in registros:
+                    dt_emp = r['data_emprestimo'].strftime('%d/%m/%Y') if r.get('data_emprestimo') else '-'
+                    dt_prev = r['data_previsao_devolucao'].strftime('%d/%m/%Y') if r.get('data_previsao_devolucao') else '-'
+                    if r.get('atrasado'):
+                        sit = f"⚠️ ATRASADO ({r['dias_atraso']}d)"
+                    else:
+                        sit = "No prazo" if r['status'] == 'EMPRESTADO' else "Devolvido"
+                    print(f"{r['id_emprestimo']:<4} | {r['nome_aluno'][:22]:<22} | {r['titulo_livro'][:28]:<28} | {dt_emp:<12} | {dt_prev:<10} | {r['status']:<11} | {sit}")
+                print("=" * 105)
+                print(f"Total listado: {len(registros)} empréstimo(s)")
+            except Exception as e:
+                print(f"❌ Erro ao gerar relatório: {e}")
+            input("\nPressione ENTER para continuar...")
+
+        elif op == "2":
+            aluno_in = input("ID do aluno (ou deixe vazio para Todos): ").strip()
+            filtro_aluno = int(aluno_in) if aluno_in.isdigit() else None
+        elif op == "3":
+            livro_in = input("ID do livro (ou deixe vazio para Todos): ").strip()
+            filtro_livro = int(livro_in) if livro_in.isdigit() else None
+        elif op == "4":
+            filtro_data_ini = input("Data Inicial (DD/MM/AAAA ou deixe vazio): ").strip() or None
+            filtro_data_fim = input("Data Final (DD/MM/AAAA ou deixe vazio): ").strip() or None
+        elif op == "5":
+            print("1. [Todos], 2. Apenas EMPRESTADO, 3. Apenas DEVOLVIDO")
+            s = input("Escolha: ").strip()
+            if s == "2":
+                filtro_status = "EMPRESTADO"
+            elif s == "3":
+                filtro_status = "DEVOLVIDO"
+            else:
+                filtro_status = None
+        elif op == "6":
+            filtro_aluno = None
+            filtro_livro = None
+            filtro_data_ini = None
+            filtro_data_fim = None
+            filtro_status = None
+            print("✅ Filtros limpos!")
+            input("Pressione ENTER para continuar...")
+        elif op == "7":
+            try:
+                registros = relatorio_service.gerar_relatorio_emprestimos(
+                    id_aluno=filtro_aluno,
+                    id_livro=filtro_livro,
+                    data_inicio=filtro_data_ini,
+                    data_fim=filtro_data_fim,
+                    status=filtro_status
+                )
+                nome_arq = input("Nome do arquivo CSV [relatorio.csv]: ").strip() or "relatorio.csv"
+                relatorio_service.exportar_relatorio_csv(registros, nome_arq)
+                print(f"✅ Arquivo salvo com sucesso como '{nome_arq}'!")
+            except Exception as e:
+                print(f"❌ Erro ao exportar CSV: {e}")
+            input("\nPressione ENTER para continuar...")
+        elif op == "8":
+            try:
+                registros = relatorio_service.gerar_relatorio_emprestimos(
+                    id_aluno=filtro_aluno,
+                    id_livro=filtro_livro,
+                    data_inicio=filtro_data_ini,
+                    data_fim=filtro_data_fim,
+                    status=filtro_status
+                )
+                nome_arq = input("Nome do arquivo HTML [relatorio.html]: ").strip() or "relatorio.html"
+                relatorio_service.exportar_relatorio_html(registros, nome_arq)
+                print(f"✅ Relatório HTML gerado em '{nome_arq}'. Abrindo no navegador...")
+                webbrowser.open(nome_arq)
+            except Exception as e:
+                print(f"❌ Erro ao exportar HTML: {e}")
+            input("\nPressione ENTER para continuar...")
+        elif op == "0":
+            break
+
+
 def main():
     if "--gui" in sys.argv:
         from app_gui import JanelaLogin
@@ -272,9 +389,10 @@ def main():
         print("1. 🎓 Gerenciar Alunos")
         print("2. 📖 Gerenciar Livros")
         print("3. 🔄 Empréstimos e Devoluções")
-        print("4. 🖥️  Abrir Interface Gráfica (Tela de Login/Sistema)")
-        print("5. 🔍 Testar Conexão com o Banco")
-        print("6. 🔄 Trocar de Usuário (Logout)")
+        print("4. 📊 Relatórios de Empréstimos (Filtros & Exportação)")
+        print("5. 🖥️  Abrir Interface Gráfica (Tela de Login/Sistema)")
+        print("6. 🔍 Testar Conexão com o Banco")
+        print("7. 🔄 Trocar de Usuário (Logout)")
         print("0. Sair")
 
         opcao = input("\nDigite sua opção: ").strip()
@@ -286,6 +404,8 @@ def main():
         elif opcao == "3":
             menu_emprestimos()
         elif opcao == "4":
+            menu_relatorios()
+        elif opcao == "5":
             print("\nAbrindo interface gráfica...")
             try:
                 from app_gui import JanelaLogin
@@ -293,12 +413,12 @@ def main():
                 app.mainloop()
             except Exception as e:
                 print(f"Erro ao abrir interface gráfica: {e}")
-        elif opcao == "5":
+        elif opcao == "6":
             sucesso, texto = test_connection()
             status = "✅ Sucesso" if sucesso else "❌ Erro"
             print(f"\n[{status}]: {texto}")
             input("\nPressione ENTER para continuar...")
-        elif opcao == "6":
+        elif opcao == "7":
             usuario_atual = autenticar_terminal()
         elif opcao == "0":
             print("\nEncerrando sistema. Até logo!")
